@@ -1,0 +1,13 @@
+obj = testmain.o test/test.o test2.o
+run : $(obj)
+	g++ -std=c++11 -o run $(obj)
+testmain.o : testmain.cpp
+	g++ -std=c++11 -c testmain.cpp -o testmain.o
+test/test.o : test/test.cpp
+	g++ -std=c++11 -c test/test.cpp -o test/test.o
+test2.o : test2.cpp
+	g++ -std=c++11 -c test2.cpp -o test2.o
+
+clean :
+	rm *.o
+	rm DataFile/*.o
