@@ -70,7 +70,7 @@ public:
     */
     Status free_seg();
     static const uint32_t META_NUMS = BlockHead::FREE_SPACE / 8 - 1; //一个元数据文件中包含的地址数量，减一是因为还要存下一个元数据块的地址
-
+    static const uint32_t PAGE_FREE_SPACE = BlockHead::FREE_SPACE; //页内可用空间大小
 private:
     Options *op;//可选操作
 
