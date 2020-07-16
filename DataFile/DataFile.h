@@ -55,7 +55,7 @@ public:
      * 这里不做缓存，直接写入文件的对应位置
      * 除了上层用户写入的数据以外，还要把块头信息一起写入
     */
-    Status write_block(const vector<uint8_t> &data, BlockHandle *bb);
+    Status write_block(const vector<uint8_t> &data, uint32_t beg, uint32_t len, BlockHandle *bb);
     /**
      * 将缓冲区内的所有数据刷到磁盘上
      * 即调用文件接口的函数写文件

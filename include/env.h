@@ -37,7 +37,7 @@ public:
      * offset：指定偏移，以字节为单位B
      * data：提取的数组
     */
-    virtual Status Write(uint64_t offset, const std::vector<uint8_t> &data) = 0;
+    virtual Status Write(uint64_t offset, const std::vector<uint8_t> &data, uint32_t beg, uint32_t len) = 0;
     /**
      * 将写入的文件刷到磁盘
     */

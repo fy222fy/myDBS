@@ -70,7 +70,7 @@ Status LinuxFile::Append(const std::vector<uint8_t> &data){
     return s;
 }
 
-Status LinuxFile::Write(uint64_t offset, const std::vector<uint8_t> &data){
+Status LinuxFile::Write(uint64_t offset, const std::vector<uint8_t> &data, uint32_t beg, uint32_t len){
     Status s;
     if(!(*file)){
         file->open(filename.c_str(),std::ios::in|std::ios::out|std::ios::binary);
@@ -78,8 +78,8 @@ Status LinuxFile::Write(uint64_t offset, const std::vector<uint8_t> &data){
     }
     file->clear();
     file->seekp(offset,std::ios::beg);
-    for(uint8_t item:data){
-        *file << item;
+    for(int i = beg; i < len; i++){
+        *file << data[i];
     }
     if(!*file) s.FetalError("文件写入失败");
     return s;

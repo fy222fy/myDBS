@@ -23,7 +23,7 @@ RWFile *new_linuxf(){
 int test_env_newandwritefile(){
     RWFile *RR = new_linuxf();
     vector<uint8_t> v{0x41,0x42,0x43,0x44};
-    Status s = RR->Write(20,v);
+    Status s = RR->Write(20,v,0,v.size());
     RR->Flush();
     if(!s.isok()) cout<< "失败" + s.err_msg() <<endl;
     else cout<< "成功" <<endl;
@@ -79,7 +79,7 @@ int test_alloc_block(){
     BlockHandle *bb;
     df->alloc_block(&bb);
     vector<uint8_t> data(BlockHead::FREE_SPACE - 4, 0x56);
-    df->write_block(data,bb);
+    df->write_block(data,0,data.size(),bb);
     //测试free功能
     //df->free_block(bb);
     //测试read功能
@@ -114,7 +114,7 @@ int test_vfs_append(Segment *sh){
     uint8_t r = (uint8_t)rand();//随机一个输入数据
     cout << r <<endl;
     vector<uint8_t> data{r,0x55,0x56,0x57,0x20,0x20,0x21,0x59};
-    sh->append(offset,data);
+    sh->append(offset,data,0,data.size());
 }
 
 int test_vfs_read(Segment *sh){
@@ -130,7 +130,7 @@ int test_vfs_free_page(Segment *sh){
 
 int test_vfs_write(Segment *sh){
     vector<uint8_t> data{0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57};
-    sh->write_page(14,data);
+    sh->write_page(14,data,0,data.size());
 }
 
 int test_vfs_free_seg(Segment *sh){

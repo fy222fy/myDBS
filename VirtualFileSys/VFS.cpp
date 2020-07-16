@@ -97,7 +97,7 @@ Status Segment::write_add_seg_info(SegsInfo *sis){
         for(int i = 0; i< 4;i++) input[findex+i] = temp[i];
         findex += 4;
     }
-    df -> write_block(input,bh);
+    df -> write_block(input,0,input.size(),bh);
     delete temp;
     delete bh;
     return s;
@@ -120,7 +120,7 @@ Status Segment::write_seg_head(BlockHandle *bh){
     for(int i = 0; i < 4; i++) result[i] = temp[i];
     temp = int32_to_int8(meta_first_addr);
     for(int i = 0; i < 4; i++) result[4 + i] = temp[i];
-    df->write_block(result,bh);
+    df->write_block(result,0,result.size(),bh);
     delete temp;
     return s;
 }
@@ -161,12 +161,12 @@ Status Segment::write_seg_meta(BlockHandle *bh, SegMeta *sm){
         for(int i = 0;i<4;i++) result[findex+i] = temp[i];
         findex+=4;
     }
-    df->write_block(result,bh);
+    df->write_block(result,0,result.size(),bh);
     return s;
 }
 
 
-Status Segment::append(uint32_t &offset, const vector<uint8_t> &data){
+Status Segment::append(uint32_t &offset, const vector<uint8_t> &data,uint32_t beg,uint32_t len){
     Status s;
     BlockHandle *bh = new BlockHandle(meta_first_addr);
     BlockHandle *p_bh;//最后对应的物理地址
@@ -209,14 +209,14 @@ Status Segment::append(uint32_t &offset, const vector<uint8_t> &data){
         delete sm2;
     }
     //到此，p_bh是最终的块，现在写入数据
-    df -> write_block(data,p_bh);
+    df -> write_block(data,beg,len,p_bh);
     delete bh;
     delete p_bh;
     delete sm;
     return s;
 }
 
-Status Segment::write_page(uint32_t offset, const vector<uint8_t> &data){
+Status Segment::write_page(uint32_t offset, const vector<uint8_t> &data,uint32_t beg,uint32_t len){
     Status s;
     int num = offset / META_NUMS;//要跳过几个元数据信息
     uint32_t own_offset = offset % META_NUMS;//最后一个元数据的内部偏移
@@ -254,7 +254,7 @@ Status Segment::write_page(uint32_t offset, const vector<uint8_t> &data){
     df->alloc_block(&bbtemp);
     sm->M[own_offset] = make_pair(0x01,bbtemp->address);
     write_seg_meta(bh,sm);
-    df->write_block(data,bbtemp);
+    df->write_block(data,beg,len,bbtemp);
     delete bh;
     delete sm;
     delete bbtemp;

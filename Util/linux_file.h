@@ -6,6 +6,7 @@
 #include <vector>
 #include <fstream>
 #include <iostream>
+using namespace std;
 /**
  * 在linux环境下实现读写文件的文件操作类，继承自RWFile
 */
@@ -41,7 +42,7 @@ public:
      * offset：指定偏移，以字节为单位B
      * data：提取的数组
     */
-    virtual Status Write(uint64_t offset, const std::vector<uint8_t> &data);
+    virtual Status Write(uint64_t offset, const std::vector<uint8_t> &result, uint32_t beg, uint32_t len);
     /**
      * 将写入的文件刷到磁盘
     */

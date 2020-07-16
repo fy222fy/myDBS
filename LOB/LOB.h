@@ -84,15 +84,15 @@ private:
     uint32_t checksum(LOBLocator *ll);//校验和计算
     Options *op;
     DataFile *df;
-    Status create_lobpage();
-    Status write_lobpage();
-    Status read_lobpage();
-    Status create_LHP();
-    Status append_LHP();
+    Status create_lobpage(uint32_t &offset,const vector<uint8_t> &data,uint32_t beg);
+    Status write_lobpage(uint32_t offset);
+    Status read_lobpage(uint32_t offset);
+    Status create_LHP(uint32_t &lhpa);
+    Status append_LHP(uint32_t lhpa, uint32_t offset);
     Status write_LHP();
     Status read_LHP();
-    Status create_LHPI();
-    Status appned_LHPI();
+    Status create_LHPI(uint32_t &lhpia);
+    Status appned_LHPI(uint32_t &lhpia, uint32_t lhpa);
     Status write_LHPI();
     Status read_LHPI();
 };

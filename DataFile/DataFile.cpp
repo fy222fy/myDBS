@@ -71,7 +71,7 @@ Status DataFile::write_head(){
     Status s;
     vector<uint8_t> result(HEAD_SIZE);
     s = serialize_head(result);
-    s = file->Write(0,result);
+    s = file->Write(0,result,0,result.size());
     return s;
 }
 
@@ -128,7 +128,7 @@ Status DataFile::write_block_head(BlockHandle *bh, BlockHead *bhead){
     data[11] = temp[2];
     data[12] = temp[3];
     //然后把数据写进去
-    s = file->Write(bh->address,data);
+    s = file->Write(bh->address,data,0,data.size());
     s = file->Flush();
     return s;
 }
@@ -159,7 +159,7 @@ Status DataFile::alloc_block(BlockHandle **pbh){
     write_block_head(*pbh,&bhead);
     //然后直接先用0补齐块的内容，后续可能要优化这里
     vector<uint8_t> tempdata(BlockHead::FREE_SPACE, 0x00);
-    file->Write((*pbh)->address + BlockHead::HEAD_SIZE,tempdata);
+    file->Write((*pbh)->address + BlockHead::HEAD_SIZE,tempdata,0,tempdata.size());
     s = file->Flush();
     //最后将这个分配出去的块加在空闲链表中
     (*free_map)[addr] = false;
@@ -177,9 +177,9 @@ Status DataFile::free_block(BlockHandle *bh){
     return s;
 }
 
-Status DataFile::write_block(const vector<uint8_t> &in_data, BlockHandle *bh){//向表中写入一些数据
+Status DataFile::write_block(const vector<uint8_t> &in_data, uint32_t beg, uint32_t len, BlockHandle *bh){//向表中写入一些数据
     Status s;
-    if(in_data.size() > BlockHead::FREE_SPACE){
+    if(len > BlockHead::FREE_SPACE){
         s.FetalError("输入块的数据太大");
         return s;
     }    
@@ -187,7 +187,7 @@ Status DataFile::write_block(const vector<uint8_t> &in_data, BlockHandle *bh){//
     bhead.used_space = in_data.size();
     s = write_block_head(bh,&bhead);
     if(!s.isok()) s.FetalError("数据块头写入文件失败");
-    s = file->Write(bh->address + BlockHead::HEAD_SIZE, in_data);
+    s = file->Write(bh->address + BlockHead::HEAD_SIZE, in_data,beg,len);
     s = file->Flush();
     if(!s.isok()) s.FetalError("数据块写入文件失败");
     return s;

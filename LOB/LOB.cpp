@@ -21,21 +21,79 @@ Status LOB::append(LOBLocator *ll, const std::vector<uint8_t> &data){
             Segment *sg;
             Segment::create_seg(ll->LOBID,df,op,&sg);
             if(newlen <= OUTLINE_1_MAX_SIZE){//可以在行内放下指示
-                ll->H.data.insert(ll->H.data.end(),data.begin(),data.end());//临时先加进来
-                int nums = ll->H.data.size()/LOB_PAGE_SIZE;
-                for(int i = 0; i < nums; i++){
-                    
+                vector<uint8_t> temp = ll->H.data;//拷贝
+                uint32_t last = LOB_PAGE_SIZE - temp.size();//缺的长度
+                temp.insert(temp.end(),data.begin(),data.begin()+last);
+                uint32_t offset;
+                create_lobpage(offset,temp,0);
+                ll->H.tail0.nums = 1;
+                ll->H.tail0.lpas.emplace_back(offset);
+                int nums = (int) (data.size()-last)/LOB_PAGE_SIZE;
+                int beg = last;//补足的开始点
+                while(nums-->0){
+                    create_lobpage(offset,data,beg);
+                    ll->H.tail0.nums ++;
+                    ll->H.tail0.lpas.emplace_back(offset);
+                    beg += LOB_PAGE_SIZE;
                 }
             }
-            else if(newlen <= OUTLINE_2_MAX_SIZE){
-
+            else if(newlen <= OUTLINE_2_MAX_SIZE){//二级方案
+                vector<uint8_t> temp = ll->H.data;//拷贝
+                uint32_t last = LOB_PAGE_SIZE - temp.size();//缺的长度
+                temp.insert(temp.end(),data.begin(),data.begin()+last);
+                uint32_t lhpa;
+                create_LHP(lhpa);//创建一个LHP
+                ll->H.tail1.lhpa = lhpa;
+                uint32_t offset;
+                create_lobpage(offset,temp,0);
+                append_LHP(lhpa,offset);//写入第一个地址
+                int nums = (int) (data.size()-last)/LOB_PAGE_SIZE;
+                int beg = last;
+                int inrow_nums = 6;
+                ll->H.tail1.nums = 6;
+                while(nums-->0){
+                    create_lobpage(offset,data,beg);
+                    beg += LOB_PAGE_SIZE;
+                    append_LHP(lhpa,offset);
+                    if(inrow_nums > 0){
+                        ll->H.tail1.lpas.emplace_back(offset);
+                    }
+                }
             }
             else if(newlen<=OUTLINE_3_MAX_SIZE){
-
+                vector<uint8_t> temp = ll->H.data;//拷贝
+                uint32_t last = LOB_PAGE_SIZE - temp.size();//缺的长度
+                temp.insert(temp.end(),data.begin(),data.begin()+last);
+                uint32_t lhpia;
+                create_LHPI(lhpia);
+                ll->H.tail2.lhpia = lhpia;
+                ll->H.tail2.nums = 6;
+                uint32_t offset;
+                create_lobpage(offset,temp,0);
+                uint32_t lhp_nums = (data.size()+temp.size())/OUTLINE_2_MAX_SIZE;//计算要多少个lhp
+                uint32_t beg = last;
+                for(int j = 0; j < lhp_nums; j++){//处理中间的lhp
+                    uint32_t lhpa;
+                    create_LHP(lhpa);
+                    appned_LHPI(lhpia, lhpa);//写入lhpindex
+                    for(int i = 0; i < LHP_NUMS;i++){
+                        if(j == 0 && i == 0){
+                            append_LHP(lhpa,offset);
+                            ll->H.tail2.lpas.emplace_back(offset);
+                            continue;
+                        }
+                        create_lobpage(offset,data,beg);
+                        beg += LOB_PAGE_SIZE;
+                        append_LHP(lhpa,offset);
+                        if(j == 0 && i < 6){
+                            ll->H.tail2.lpas.emplace_back(offset);
+                        }
+                    }
+                }
             }
             else{
                 s.FetalError("插入的数据超过最大限制");
-                return s
+                return s;
             }
         }
     }
@@ -70,5 +128,4 @@ uint32_t LOB::checksum(LOBLocator *ll){
     return 0x01;
 }
 
-Status LOB::
 

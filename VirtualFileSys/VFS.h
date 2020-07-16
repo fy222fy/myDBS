@@ -48,13 +48,13 @@ public:
      * offset：逻辑地址，函数会自动寻找一个逻辑地址传出。
      * data：要写入的数据，不能大于一页
     */
-    Status append(uint32_t &offset, const vector<uint8_t> &data);
+    Status append(uint32_t &offset, const vector<uint8_t> &data,uint32_t beg,uint32_t len);
     /**
      * 在指定的段空间的指定页处写入数据
      * offset：确定的逻辑地址（要在外层保证逻辑地址还没有使用过，否则出错）
      * data：要写入的数据
     */
-    Status write_page(uint32_t offset, const vector<uint8_t> &data);
+    Status write_page(uint32_t offset, const vector<uint8_t> &data,uint32_t beg,uint32_t len);
     /**
      * 在指定的段空间的指定页读取数据
      * offset：逻辑地址
