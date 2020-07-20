@@ -1,7 +1,6 @@
 #include "LOB_locator.h"
 #include "LOB.h"
 
-
 Status LOBLocator::Serialize(std::vector<uint8_t> &result, LOBLocator **ll){
     ;
 }
@@ -10,7 +9,7 @@ Status LOBLocator::Deserialize(const std::vector<uint8_t> &input, LOBLocator *ll
 }
 
 LOB::LOB(DataFile* df, Options *op):df(df),op(op){
-
+    ;
 }
 
 Status LOB::create(LOBLocator **llp, uint32_t seg_id){
@@ -30,8 +29,8 @@ Status LOB::append(LOBLocator *ll, const std::vector<uint8_t> &data){
             return s;
         }
         else{//否则是行外存，先初始化一个段
-            Segment *sg;
-            Segment::create_seg(ll->LOBID,df,op,&sg);
+            VFS *vfs = VFS::get_VFS();
+            vfs->create_seg(ll->LOBID);
             if(newlen <= OUTLINE_1_MAX_SIZE){//可以在行内放下指示
                 vector<uint8_t> temp = ll->H.data;//拷贝
                 uint32_t last = LOB_PAGE_SIZE - temp.size();//缺的长度
@@ -125,16 +124,20 @@ Status LOB::append(LOBLocator *ll, const std::vector<uint8_t> &data){
     
 }
 Status LOB::write(LOBLocator *ll, uint32_t offset, const std::vector<uint8_t> &data){
-    
+    Status s;
+    return s;
 }
 Status LOB::read(LOBLocator *ll, uint32_t amount, uint32_t offset, std::vector<uint8_t> &result){
-    
+    Status s;
+    return s;
 }
 Status LOB::erase(LOBLocator *ll, uint32_t amount, uint32_t offset){
-
+    Status s;
+    return s;
 }
 Status LOB::drop(LOBLocator *ll){
-    
+    Status s;
+    return s;
 }
 uint32_t LOB::checksum(LOBLocator *ll){
     return 0x01;

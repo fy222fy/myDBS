@@ -11,7 +11,6 @@
 #include<fstream>
 #include<vector>
 #include "../include/env.h"
-using namespace std;
 
 /**
  * 宏块块头的结构，该结构与磁盘上的宏块结构对应。

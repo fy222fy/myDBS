@@ -55,19 +55,15 @@ public:
     Status write(LOBLocator *ll, uint32_t offset, const std::vector<uint8_t> &data);//覆写数据
     Status read(LOBLocator *ll, uint32_t amount, uint32_t offset, std::vector<uint8_t> &result);//读取数据
     Status erase(LOBLocator *ll, uint32_t amount, uint32_t offset);//删除部分数据
-    Status write(LOBLocator *ll, uint32_t offset, const std::vector<uint8_t> &data);//覆写数据
-    Status read(LOBLocator *ll, uint32_t amount, uint32_t offset, std::vector<uint8_t> &result);//读取数据
-    Status erase(LOBLocator *ll, uint32_t amount, uint32_t offset);//删除部分数据
     Status drop(LOBLocator *ll);//删除指向的所有lob数据
-    static const uint32_t LOB_PAGE_SIZE = Segment::PAGE_FREE_SPACE - LOBHead::HEAD_SIZE;
-    static const uint32_t LHP_SIZE = Segment::PAGE_FREE_SPACE - LHPHead::HEAD_SIZE;
+    static const uint32_t LOB_PAGE_SIZE = VFS::PAGE_FREE_SPACE - LOBHead::HEAD_SIZE;
+    static const uint32_t LHP_SIZE = VFS::PAGE_FREE_SPACE - LHPHead::HEAD_SIZE;
     static const uint32_t LHP_NUMS = LHP_SIZE / 4;
-    static const uint32_t LHPI_SIZE = Segment::PAGE_FREE_SPACE - LHPIHead::HEAD_SIZE;
+    static const uint32_t LHPI_SIZE = VFS::PAGE_FREE_SPACE - LHPIHead::HEAD_SIZE;
     static const uint32_t LHPI_NUMS = LHPI_SIZE / 4;
     static const uint32_t OUTLINE_1_MAX_SIZE = LOBLocator::MAX_LPA * LOB_PAGE_SIZE;//行外存1模式最大数据量
     static const uint32_t OUTLINE_2_MAX_SIZE = LHP_NUMS * LOB_PAGE_SIZE;
     static const uint32_t OUTLINE_3_MAX_SIZE = LHPI_NUMS * LHP_NUMS * LOB_PAGE_SIZE;
-    
     /**
      * 
     */

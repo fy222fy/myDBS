@@ -2,7 +2,7 @@
 #define OB_LOB_LOCATOR
 #include<string>
 #include<vector>
-#include<../include/status.h>
+#include "../include/status.h"
 #include "../VirtualFileSys/VFS.h"
 
 
@@ -30,7 +30,6 @@ struct LOBLocator{
             uint32_t lhpa;//LHP的地址
         }tail1;
         struct{
-            uint32_t nums;//数量
             uint32_t nums;//数量
             std::vector<uint32_t> lpas;
             uint32_t lhpia;//LHP index的地址

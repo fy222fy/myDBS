@@ -93,49 +93,41 @@ int test_alloc_block(){
 int test_vfs_crerate_seg(int id){
     Env *env = new LinuxEnv();
     Options *op = new Options(env);
-    DataFile *df;
-    DataFile::open_datafile("myFile",op,&df);
-    Segment *sh;
-    Segment::create_seg(id,df,op,&sh);//创建这个段
-    delete sh;
+    VFS *vfs = VFS::get_VFS(op);
+    vfs->create_seg(id);//创建这个段
 }
 
-Segment *test_vfs_open_seg(int id){
-    Env *env = new LinuxEnv();
-    Options *op = new Options(env);
-    DataFile *df;
-    DataFile::open_datafile("myFile",op,&df);
-    Segment *sh;
-    Segment::open_seg(id,df,op,&sh);
-    return sh;
-}
-
-int test_vfs_append(Segment *sh){
+int test_vfs_append(uint32_t id){
     uint32_t offset;
     uint8_t r = (uint8_t)rand();//随机一个输入数据
     cout << r <<endl;
     vector<uint8_t> data{r,0x55,0x56,0x57,0x20,0x20,0x21,0x59};
-    sh->append(offset,data,0,data.size());
+    VFS *vfs = VFS::get_VFS();
+    vfs->append(id,offset,data,0,data.size());
 }
 
-int test_vfs_read(Segment *sh){
+int test_vfs_read(uint32_t id){
     uint32_t offset = 14;
     vector<uint8_t> data;
-    sh->read_page(offset,data);
+    VFS *vfs = VFS::get_VFS();
+    vfs->read_page(id,offset,data);
     return 3;
 }
 
-int test_vfs_free_page(Segment *sh){
-    sh->free_page(14);
+int test_vfs_free_page(uint32_t id){
+    VFS *vfs = VFS::get_VFS();
+    vfs->free_page(id,14);
 }
 
-int test_vfs_write(Segment *sh){
+int test_vfs_write(uint32_t id){
     vector<uint8_t> data{0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57};
-    sh->write_page(14,data,0,data.size());
+    VFS *vfs = VFS::get_VFS();
+    vfs->write_page(id,14,data,0,data.size());
 }
 
-int test_vfs_free_seg(Segment *sh){
-    sh->free_seg();
+int test_vfs_free_seg(uint32_t id){
+    VFS *vfs = VFS::get_VFS();
+    vfs->free_seg(id);
 }
 
 int test_lob(int id){
@@ -143,20 +135,12 @@ int test_lob(int id){
     Options *op = new Options(env);
     DataFile *df;
     DataFile::open_datafile("myFile",op,&df);
-    LOB lob(df,op);
-    vector<uint8_t> data(0x63,10);
-    LOBLocator ll()
+    
 }
 
 int main(){
-    create_adatafile();
     test_vfs_crerate_seg(1);
-    Segment *sh = test_vfs_open_seg(1);
-
-
-
-
-
+    test_vfs_append(1);
     exit(1);
 }
 

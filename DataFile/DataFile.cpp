@@ -39,7 +39,7 @@ Status DataFile::open_datafile(string fname, Options *options, DataFile **df){
     return s;
 }
 
-bool if_exist(string fname, Options *op){
+bool DataFile::if_exist(string fname, Options *op){
     return op->env->if_exsist(fname);
 }
 

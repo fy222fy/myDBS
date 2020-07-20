@@ -16,7 +16,6 @@
 #include "Block.h"
 using namespace std;
 
-
 /**
  * 数据文件结构，提供打开数据文件、创建数据文件、分配块、写块、读块、释放块等操作。
 */
@@ -28,16 +27,16 @@ public:
      * 如果当前还不存在数据文件，调用该函数
      * 以给定文件名创建一个数据文件，并返回该数据文件指针
     */
-    static Status open_datafile(string fname, Options *options, DataFile **df);
+    static Status open_datafile(std::string fname, Options *options, DataFile **df);
     /**
      * 如果当前还不存在数据文件，调用该函数
      * 以给定文件名创建一个数据文件，并返回该数据文件指针
     */
-    static Status create_datafile(string fname, Options *options, DataFile **df);
+    static Status create_datafile(std::string fname, Options *options, DataFile **df);
     /**
      * 判断一个数据文件是不是已经存在
     */
-    static bool if_exist(string fnmae);
+    static bool if_exist(std::string fname, Options *op);
     /**
      * 数据文件操作完毕后，如写入数据完成
      * 则关闭文件指针等资源
