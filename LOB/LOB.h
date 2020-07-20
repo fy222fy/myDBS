@@ -49,21 +49,12 @@ struct LHPIHead
 */
 class LOB{
 public:
-    LOB();
-    /**
-     * 创建一个空的lob，获取locator
-     * write_data
-     * read_data
-     * write_LHP
-     * read_LHP
-     * write_LHPIndex
-     * 
-    */
+    LOB(DataFile* df, Options *op);
+    Status create(LOBLocator **llp, uint32_t seg_id);//创建一个空的lob，获取locator
     Status append(LOBLocator *ll, const std::vector<uint8_t> &data);//追加数据，并修改locator结构
     Status write(LOBLocator *ll, uint32_t offset, const std::vector<uint8_t> &data);//覆写数据
     Status read(LOBLocator *ll, uint32_t amount, uint32_t offset, std::vector<uint8_t> &result);//读取数据
     Status erase(LOBLocator *ll, uint32_t amount, uint32_t offset);//删除部分数据
-    Status append(LOBLocator *ll, const std::vector<uint8_t> &data);//追加任意数量数据，并修改locator结构
     Status write(LOBLocator *ll, uint32_t offset, const std::vector<uint8_t> &data);//覆写数据
     Status read(LOBLocator *ll, uint32_t amount, uint32_t offset, std::vector<uint8_t> &result);//读取数据
     Status erase(LOBLocator *ll, uint32_t amount, uint32_t offset);//删除部分数据

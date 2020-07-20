@@ -1,10 +1,22 @@
 #include "LOB_locator.h"
 #include "LOB.h"
+
+
 Status LOBLocator::Serialize(std::vector<uint8_t> &result, LOBLocator **ll){
     ;
 }
 Status LOBLocator::Deserialize(const std::vector<uint8_t> &input, LOBLocator *ll){
     ;
+}
+
+LOB::LOB(DataFile* df, Options *op):df(df),op(op){
+
+}
+
+Status LOB::create(LOBLocator **llp, uint32_t seg_id){
+    uint32_t lob_new_id =  seg_id;//如果要第二个LOB，这里要增长
+    *llp = new LOBLocator(lob_new_id,0x01);
+    
 }
 
 Status LOB::append(LOBLocator *ll, const std::vector<uint8_t> &data){
@@ -128,4 +140,6 @@ uint32_t LOB::checksum(LOBLocator *ll){
     return 0x01;
 }
 
+
+///////////////////////private function///////////////////////
 

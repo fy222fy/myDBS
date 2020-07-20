@@ -151,3 +151,9 @@ Status LinuxEnv::DeleteFile(const std::string &filename){
     return s;
 }
 
+bool LinuxEnv::if_exsist(const std::string &filename){
+    std::ifstream fin(filename);
+    if(fin) return true;
+    return false;
+}
+

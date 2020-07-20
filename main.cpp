@@ -7,6 +7,7 @@
 #include "DataFile/Block.h"
 #include "DataFile/DataFile.h"
 #include "VirtualFileSys/VFS.h"
+#include "LOB/LOB.h"
 #include <ctime>
 using namespace std;
 
@@ -137,24 +138,21 @@ int test_vfs_free_seg(Segment *sh){
     sh->free_seg();
 }
 
+int test_lob(int id){
+    Env *env = new LinuxEnv();
+    Options *op = new Options(env);
+    DataFile *df;
+    DataFile::open_datafile("myFile",op,&df);
+    LOB lob(df,op);
+    vector<uint8_t> data(0x63,10);
+    LOBLocator ll()
+}
+
 int main(){
     create_adatafile();
     test_vfs_crerate_seg(1);
     Segment *sh = test_vfs_open_seg(1);
-    for(int i = 0;i<20;i++) test_vfs_append(sh);
-    test_vfs_read(sh);
-    test_vfs_free_page(sh);
-    test_vfs_append(sh);
-    test_vfs_free_page(sh);
-    test_vfs_write(sh);
-    test_vfs_free_seg(sh);
 
-    test_vfs_crerate_seg(2);
-    test_vfs_crerate_seg(3);
-    Segment *sh2 = test_vfs_open_seg(2);
-    test_vfs_append(sh2);
-    test_vfs_append(sh2);
-    test_vfs_write(sh2);
 
 
 

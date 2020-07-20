@@ -80,6 +80,10 @@ public:
      * 给定文件名删除一个文件
     */
     virtual Status DeleteFile(const std::string &filename) = 0;
+    /**
+     * 给定文件名确定文件是否存在
+    */
+    virtual bool if_exsist(const std::string &filename) = 0;
 };
 
 #endif /**/

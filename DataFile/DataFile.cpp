@@ -39,6 +39,9 @@ Status DataFile::open_datafile(string fname, Options *options, DataFile **df){
     return s;
 }
 
+bool if_exist(string fname, Options *op){
+    return op->env->if_exsist(fname);
+}
 
 Status DataFile::serialize_head(vector<uint8_t> &result){
     Status s;

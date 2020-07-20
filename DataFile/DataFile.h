@@ -35,6 +35,10 @@ public:
     */
     static Status create_datafile(string fname, Options *options, DataFile **df);
     /**
+     * 判断一个数据文件是不是已经存在
+    */
+    static bool if_exist(string fnmae);
+    /**
      * 数据文件操作完毕后，如写入数据完成
      * 则关闭文件指针等资源
     */
