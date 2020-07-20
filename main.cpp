@@ -140,7 +140,12 @@ int test_lob(int id){
 
 int main(){
     test_vfs_crerate_seg(1);
-    test_vfs_append(1);
+    for(int i = 0; i < 20; i++) 
+        test_vfs_append(1);
+    test_vfs_read(1);
+    test_vfs_free_page(1);
+    test_vfs_write(1);
+    test_vfs_free_seg(1);
     exit(1);
 }
 

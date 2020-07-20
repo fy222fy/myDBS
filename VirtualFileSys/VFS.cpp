@@ -151,12 +151,12 @@ Status VFS::free_seg(uint32_t id){
     int i =0;
     if(M.count(id) == 0) s.FetalError("系统中不存在你要删除的段，确定id正确？");
     uint32_t addr = M[id];
-    BlockHandle bh_head(addr);//段头的位置
+    BlockHandle *bh_head = new BlockHandle(addr);//段头的位置
     SegHead *sh;
-    read_seg_head(&bh_head,&sh);//读取段头结构
-    BlockHandle bh2(sh->meta_first_addr);//获得第一个元数据信息块地址
-    free_all_page(&bh2);//递归释放所有的块，不用再释放bh一次了
-    df -> free_block(&bh_head);//段头页也释放
+    read_seg_head(bh_head,&sh);//读取段头结构
+    BlockHandle *bh2 = new BlockHandle(sh->meta_first_addr);//获得第一个元数据信息块地址
+    free_all_page(bh2);//递归释放所有的块，不用再释放bh一次了
+    df -> free_block(bh_head);//段头页也释放
     M.erase(id);//从M中删除段头的信息
     nums--;
     //下面写入新的段info
@@ -202,9 +202,9 @@ Status VFS::free_all_page(BlockHandle *bh){
 Status VFS::append(uint32_t id, uint32_t &offset, const vector<uint8_t> &data,uint32_t beg,uint32_t len){
     Status s;
     if(M.count(id) == 0) s.FetalError("系统中不存在你要删除的段，确定id正确？");
-    BlockHandle head_addr(M[id]);
+    BlockHandle *head_addr = new BlockHandle(M[id]);
     SegHead *sh;
-    read_seg_head(&head_addr,&sh);
+    read_seg_head(head_addr,&sh);
     BlockHandle *bh = new BlockHandle(sh->meta_first_addr);
     BlockHandle *p_bh;//最后对应的物理地址
     SegMeta *sm;
@@ -237,7 +237,7 @@ Status VFS::append(uint32_t id, uint32_t &offset, const vector<uint8_t> &data,ui
         df -> alloc_block(&bh2);
         sm->next_meta_addr = bh2->address;
         write_seg_meta(bh,sm);
-        SegMeta *sm2;
+        SegMeta *sm2 = new SegMeta();
         df -> alloc_block(&p_bh);//申请一个新的块来写入
         sm2->M[0] = make_pair(0x01,p_bh->address);
         write_seg_meta(bh2,sm2);//把心申请的元数据块写入文件
