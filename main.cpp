@@ -130,15 +130,7 @@ int test_vfs_free_seg(uint32_t id){
     vfs->free_seg(id);
 }
 
-int test_lob(int id){
-    Env *env = new LinuxEnv();
-    Options *op = new Options(env);
-    DataFile *df;
-    DataFile::open_datafile("myFile",op,&df);
-    
-}
-
-int main(){
+void a_single_fun_to_test_VFS(){
     test_vfs_crerate_seg(1);
     for(int i = 0; i < 20; i++) 
         test_vfs_append(1);
@@ -146,6 +138,22 @@ int main(){
     test_vfs_free_page(1);
     test_vfs_write(1);
     test_vfs_free_seg(1);
+}
+
+int test_lob(){
+    Env *env = new LinuxEnv();
+    Options *op = new Options(env);
+    VFS *vfs = VFS::get_VFS(op);
+    LOB *lob = new LOB();
+    LOBLocator *ll;
+    lob->create(&ll);
+    vector<uint8_t> data(0x66,22);
+    lob->append(ll,data);
+    
+}
+
+int main(){
+    test_lob();
     exit(1);
 }
 

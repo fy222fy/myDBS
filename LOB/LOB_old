@@ -1,0 +1,345 @@
+#include "LOB_locator.h"
+#include "LOB.h"
+
+Status LOBLocator::Serialize(std::vector<uint8_t> &result, LOBLocator **ll){
+    ;
+}
+Status LOBLocator::Deserialize(const std::vector<uint8_t> &input, LOBLocator *ll){
+    ;
+}
+
+LOB::LOB(){
+    ;
+}
+
+uint32_t LOB::new_lob_id(){
+    return 1001;
+}
+
+Status LOB::create(LOBLocator **llp){
+    Status s;
+    uint32_t lob_new_id =  new_lob_id();
+    *llp = new LOBLocator(lob_new_id,0x01);
+    return s;
+}
+
+Status LOB::append(LOBLocator *ll, const std::vector<uint8_t> &data){
+    Status s;
+    uint32_t newlen = data.size() + ll->data_size;
+    if(newlen > LOB::OUTLINE_3_MAX_SIZE){
+        s.FetalError("插入的数据超过最大限制");
+        return s;
+    }
+    if(ll->mode == 0x10){//初始行内存
+        if(newlen <= LOBLocator::INLINE_MAX_SIZE){//继续行内存
+            ll->data_size += data.size();
+            ll->H.data.insert(ll->H.data.end(),data.begin(),data.end());//直接插入数据
+            ll->LOB_checksum = checksum(ll);
+            return s;
+        }
+        else{//否则是行外存，先初始化一个段
+            VFS *vfs = VFS::get_VFS();
+            vfs->create_seg(ll->LOBID);
+            if(newlen <= OUTLINE_1_MAX_SIZE){//可以在行内放下指示
+                ll->mode = 0x11;
+                vector<uint8_t> temp = ll->H.data;//拷贝
+                uint32_t last = LOB_PAGE_SIZE - temp.size();//缺的长度
+                temp.insert(temp.end(),data.begin(),data.begin()+last);
+                uint32_t offset;
+                create_lobpage(offset,temp,0);
+                ll->H.tail0.nums = 1;
+                ll->H.tail0.lpas.emplace_back(offset);
+                int nums = (int) (data.size()-last)/LOB_PAGE_SIZE;
+                int beg = last;//补足的开始点
+                while(nums-->0){
+                    create_lobpage(offset,data,beg);
+                    ll->H.tail0.nums ++;
+                    ll->H.tail0.lpas.emplace_back(offset);
+                    beg += LOB_PAGE_SIZE;
+                }
+            }
+            else if(newlen <= OUTLINE_2_MAX_SIZE){//二级方案
+                ll->mode = 0x12;
+                vector<uint8_t> temp = ll->H.data;//拷贝
+                uint32_t last = LOB_PAGE_SIZE - temp.size();//缺的长度
+                temp.insert(temp.end(),data.begin(),data.begin()+last);
+                uint32_t lhpa;
+                create_LHP(lhpa);//创建一个LHP
+                ll->H.tail1.lhpa = lhpa;//尾巴赋值
+                int nums = (int) (data.size() + ll->data_size)/LOB_PAGE_SIZE;
+                int beg = last;
+                ll->H.tail1.lpas.clear();
+                ll->H.tail1.nums = LOBLocator::MAX_LPA;
+                uint32_t offset;
+                for(int i = 0; i < nums; i++){
+                    if(i == 0){//处理首个
+                        create_lobpage(offset,temp,0);
+                        append_LHP(lhpa,offset);
+                        continue;
+                    }
+                    create_lobpage(offset,data,beg);
+                    append_LHP(lhpa,offset);
+                    beg += LOB_PAGE_SIZE;
+                    if(i < LOBLocator::MAX_LPA){
+                        ll->H.tail1.lpas.emplace_back(offset);
+                    }
+                }
+            }
+            else if(newlen<=OUTLINE_3_MAX_SIZE){
+                ll->mode = 0x13;
+                vector<uint8_t> temp = ll->H.data;//拷贝
+                uint32_t last = LOB_PAGE_SIZE - temp.size();//缺的长度
+                temp.insert(temp.end(),data.begin(),data.begin()+last);
+                uint32_t lhpia;
+                create_LHIP(lhpia);
+                ll->H.tail2.lhpia = lhpia;
+                ll->H.tail2.nums = LOBLocator::MAX_LPA;
+                uint32_t lhp_nums = (data.size()+ll->data_size)/OUTLINE_2_MAX_SIZE;//计算要多少个lhp
+                uint32_t beg = last;
+                uint32_t offset;
+                for(int j = 0; j < lhp_nums; j++){
+                    uint32_t lhpa;
+                    create_LHP(lhpa);
+                    for(int i = 0; i < LHP_NUMS; i++){
+                        if(j == 0 && i == 0){//处理首个
+                            create_lobpage(offset,temp,0);
+                            append_LHP(lhpa,offset);
+                            continue;
+                        }
+                        create_lobpage(offset,data,beg);
+                        append_LHP(lhpa,offset);
+                        beg += LOB_PAGE_SIZE;
+                        if(j == 0 && i < LOBLocator::MAX_LPA){//处理行内存的6个
+                            ll->H.tail2.lpas.emplace_back(offset);
+                        }
+                    }
+                    appned_LHIP(lhpia,lhpa);
+                }
+            }
+        }
+    }
+    else if(ll->mode == 0x11){//初始行外存1
+        if(newlen <= LOB::OUTLINE_1_MAX_SIZE){//可以继续这样存
+            //先把最后一个块不足的地方读出来
+            //然后再把这个块填满后写入
+            //剩余的依次处理
+            uint32_t last_page_offset = ll->H.tail0.lpas[ll->H.tail0.nums-1];
+            vector<uint8_t> temp;
+            read_lobpage(last_page_offset, temp);//读取最后一个块
+            uint32_t last = LOB_PAGE_SIZE - temp.size();//缺的长度
+            temp.insert(temp.end(),data.begin(),data.begin()+last);
+            free_lobpage(last_page_offset);//释放掉这个块
+            uint32_t offset;
+            create_lobpage(offset,temp,0);//写一个块
+            ll->H.tail0.lpas[ll->H.tail0.nums-1] = offset;
+            int nums = (int) (data.size()-last)/LOB_PAGE_SIZE;
+            int beg = last;//补足的开始点
+            while(nums-->0){
+                create_lobpage(offset,data,beg);
+                ll->H.tail0.nums ++;
+                ll->H.tail0.lpas.emplace_back(offset);
+                beg += LOB_PAGE_SIZE;
+            }
+        }
+        else if(newlen <= LOB::OUTLINE_2_MAX_SIZE){
+            ll->mode = 0x12;
+            int inrow_lpa_nums = ll->H.tail0.nums;
+            vector<uint32_t> temp_lpas = ll->H.tail0.lpas;
+            uint32_t last_page_offset = ll->H.tail0.lpas[ll->H.tail0.nums-1];
+            vector<uint8_t> temp;
+            read_lobpage(last_page_offset, temp);//读取最后一个块
+            uint32_t last = LOB_PAGE_SIZE - temp.size();//缺的长度
+            temp.insert(temp.end(),data.begin(),data.begin()+last);
+            free_lobpage(last_page_offset);//释放掉这个块
+            uint32_t offset;
+            create_lobpage(offset,temp,0);//写一个块
+            temp_lpas[inrow_lpa_nums-1] = offset;
+            uint32_t lhpa;
+            create_LHP(lhpa);//创建一个lhp
+            ll->H.tail1.nums = LOBLocator::MAX_LPA;
+            ll->H.tail1.lhpa = lhpa;
+            int beg = last;
+            int nums = (data.size() + ll->data_size) / LOB_PAGE_SIZE;
+            uint32_t offset;
+            for(int i = 0; i < nums; i++){
+                if(i < inrow_lpa_nums){
+                    append_LHP(lhpa,temp_lpas[i]);
+                    ll->H.tail1.lpas.emplace_back(temp_lpas[i]);
+                    continue;
+                }
+                create_lobpage(offset,data,beg);
+                append_LHP(lhpa,offset);
+                beg += LOB_PAGE_SIZE;
+                if(i < LOBLocator::MAX_LPA){
+                    ll->H.tail1.lpas.emplace_back(offset);
+                }
+            }
+        }
+        else if(newlen <= LOB::OUTLINE_3_MAX_SIZE){
+            ll->mode = 0x12;
+            int inrow_lpa_nums = ll->H.tail0.nums;
+            vector<uint32_t> temp_lpas = ll->H.tail0.lpas;
+            uint32_t last_page_offset = ll->H.tail0.lpas[ll->H.tail0.nums-1];
+            vector<uint8_t> temp;
+            read_lobpage(last_page_offset, temp);//读取最后一个块
+            uint32_t last = LOB_PAGE_SIZE - temp.size();//缺的长度
+            temp.insert(temp.end(),data.begin(),data.begin()+last);
+            free_lobpage(last_page_offset);//释放掉这个块
+            uint32_t offset;
+            create_lobpage(offset,temp,0);//写一个块
+            temp_lpas[inrow_lpa_nums-1] = offset;
+            uint32_t lhipa;
+            create_LHIP(lhipa);
+            ll->H.tail2.lhpia = lhipa;
+            ll->H.tail2.nums = LOBLocator::MAX_LPA;
+            uint32_t lhp_nums = (data.size()+ll->data_size)/OUTLINE_2_MAX_SIZE;//计算要多少个lhp
+            uint32_t beg = last;
+            uint32_t offset;
+            for(int j = 0; j < lhp_nums; j++){
+                uint32_t lhpa;
+                create_LHP(lhpa);
+                for(int i = 0; i < LHP_NUMS; i++){
+                    if(j == 0 && i < inrow_lpa_nums){//处理首个
+                        append_LHP(lhpa,temp_lpas[i]);
+                        ll->H.tail2.lpas.emplace_back(temp_lpas[i]);
+                        continue;
+                    }
+                    create_lobpage(offset,data,beg);
+                    append_LHP(lhpa,offset);
+                    beg += LOB_PAGE_SIZE;
+                    if(j == 0 && i < LOBLocator::MAX_LPA){//处理行内存的6个
+                        ll->H.tail2.lpas.emplace_back(offset);
+                    }
+                }
+                appned_LHIP(lhipa,lhpa);
+            }
+        }
+    }
+    else if(ll->mode == 0x12){
+        if(newlen <= LOB::OUTLINE_2_MAX_SIZE){//2模式没超过
+            uint32_t last_page_offset = (uint32_t) (ll->data_size / LOB_PAGE_SIZE);
+            vector<uint8_t> temp;
+            if(ll->data_size % LOB_PAGE_SIZE != 0){
+                read_lobpage(last_page_offset,temp);
+            }
+            uint32_t last = LOB_PAGE_SIZE - temp.size();//缺的长度
+            temp.insert(temp.end(),data.begin(),data.begin()+last);
+            write_lobpage(last_page_offset,temp,0);
+            uint32_t lhpa = ll->H.tail1.lhpa;
+            uint32_t beg = last;
+            int nums = (data.size() - last) / LOB_PAGE_SIZE;
+            uint32_t offset;
+            for(int i = 0; i < nums; i++){
+                create_lobpage(offset,data,beg);
+                beg += LOB_PAGE_SIZE;
+            }
+        }
+        else if(newlen <= LOB::OUTLINE_3_MAX_SIZE){
+            ll->mode = 0x13;
+            vector<uint32_t> templpas = ll->H.tail1.lpas;
+            uint32_t tmp_lhpa = ll->H.tail1.lhpa;
+            ll->H.tail2.lpas = templpas;
+            ll->H.tail2.nums = LOBLocator::MAX_LPA;
+            uint32_t lhipa;
+            create_LHIP(lhipa);//创建二级index
+            uint32_t last_page_offset = (uint32_t) (ll->data_size/LOB_PAGE_SIZE);
+            vector<uint8_t> temp;
+            if(ll->data_size %LOB_PAGE_SIZE!=0){
+                read_lobpage(last_page_offset,temp);
+            }
+            uint32_t last = LOB_PAGE_SIZE - temp.size();
+            temp.insert(temp.end(),data.begin(),data.begin()+last);
+            write_lobpage(last_page_offset,temp,0);
+            int lhp_nums = (data.size() + ll->data_size) / OUTLINE_2_MAX_SIZE;
+            int beg = last_page_offset;
+            uint32_t offset;
+            for(int j = 0; j < lhp_nums;j++){
+                uint32_t lhpa;
+                if(j == 0) lhpa = tmp_lhpa;
+                else create_LHP(lhpa);
+                for(int i = 0; i < LHP_NUMS; i++){
+                    if(j == 0){
+                        i = last_page_offset;
+                        continue;
+                    }
+                    create_lobpage(offset,data,beg);
+                    beg+=LOB_PAGE_SIZE;
+                } 
+                appned_LHIP(lhipa,lhpa);
+            }
+        }
+    }
+    else if(ll->mode == 0x13){
+        uint32_t last_page_offset = (uint32_t) (ll->data_size / LOB_PAGE_SIZE);
+        vector<uint8_t> temp;
+        if(ll->data_size % LOB_PAGE_SIZE != 0){
+            read_lobpage(last_page_offset,temp);
+        }
+        uint32_t last = LOB_PAGE_SIZE - temp.size();//缺的长度
+        temp.insert(temp.end(),data.begin(),data.begin()+last);
+        write_lobpage(last_page_offset,temp,0);
+        int lhp_nums = (data.size() + ll->data_size) / OUTLINE_2_MAX_SIZE;
+        int beg = last_page_offset;
+    }
+    else{
+        s.FetalError("模式错误");
+        return s;
+    }
+    
+}
+Status LOB::write(LOBLocator *ll, uint32_t offset, const std::vector<uint8_t> &data){
+    Status s;
+    return s;
+}
+Status LOB::read(LOBLocator *ll, uint32_t amount, uint32_t offset, std::vector<uint8_t> &result){
+    Status s;
+    return s;
+}
+Status LOB::erase(LOBLocator *ll, uint32_t amount, uint32_t offset){
+    Status s;
+    return s;
+}
+Status LOB::drop(LOBLocator *ll){
+    Status s;
+    return s;
+}
+///////////////////////private function///////////////////////
+
+uint32_t LOB::checksum(LOBLocator *ll){
+    return 0x01;
+}
+
+Status LOB::create_lobpage(uint32_t &offset,const vector<uint8_t> &data,uint32_t beg){
+    
+}
+Status LOB::write_lobpage(uint32_t offset){
+
+}
+Status LOB::read_lobpage(uint32_t offset, vector<uint8_t> &out){
+
+}
+Status LOB::create_LHP(uint32_t &lhpa){
+
+}
+Status LOB::append_LHP(uint32_t lhpa, uint32_t offset){
+
+}
+Status LOB::write_LHP(uint32_t offset, uint32_t lob_offset){
+
+}
+Status LOB::read_LHP(){
+
+}
+Status LOB::create_LHIP(uint32_t &lhpia){
+
+}
+Status LOB::appned_LHIP(uint32_t lhpia, uint32_t lhpa){
+
+}
+Status LOB::write_LHIP(){
+
+}
+Status LOB::read_LHIP(){
+    
+}
+

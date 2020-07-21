@@ -201,7 +201,7 @@ Status VFS::free_all_page(BlockHandle *bh){
 
 Status VFS::append(uint32_t id, uint32_t &offset, const vector<uint8_t> &data,uint32_t beg,uint32_t len){
     Status s;
-    if(M.count(id) == 0) s.FetalError("系统中不存在你要删除的段，确定id正确？");
+    if(M.count(id) == 0) s.FetalError("系统中不存在你要的段，确定id正确？");
     BlockHandle *head_addr = new BlockHandle(M[id]);
     SegHead *sh;
     read_seg_head(head_addr,&sh);
@@ -255,7 +255,7 @@ Status VFS::append(uint32_t id, uint32_t &offset, const vector<uint8_t> &data,ui
 
 Status VFS::write_page(uint32_t id, uint32_t offset, const vector<uint8_t> &data,uint32_t beg,uint32_t len){
     Status s;
-    if(M.count(id) == 0) s.FetalError("系统中不存在你要删除的段，确定id正确？");
+    if(M.count(id) == 0) s.FetalError("系统中不存在你要的段，确定id正确？");
     BlockHandle head_addr(M[id]);
     SegHead *sh;
     read_seg_head(&head_addr,&sh);
@@ -287,18 +287,23 @@ Status VFS::write_page(uint32_t id, uint32_t offset, const vector<uint8_t> &data
     }
     //现在已经定位到了最后一个块 sm bh
     if(sm->M[own_offset].first == 0x01){ //表明该页已经在使用
-        s.FetalError("该页正在使用，继续写入会覆盖原有的值");
+        BlockHandle *bhtmp = new BlockHandle(sm->M[own_offset].second);
+        df->write_block(data,beg,len,bh);//覆盖写入
+        delete bhtmp;
+    }
+    else{
+        BlockHandle *bbtemp;
+        df->alloc_block(&bbtemp);
+        sm->M[own_offset] = make_pair(0x01,bbtemp->address);
+        write_seg_meta(bh,sm);
+        df->write_block(data,beg,len,bbtemp);
+        delete bbtemp;
     }
     //现在为该页分配新的块，然后写入
-    BlockHandle *bbtemp;
-    df->alloc_block(&bbtemp);
-    sm->M[own_offset] = make_pair(0x01,bbtemp->address);
-    write_seg_meta(bh,sm);
-    df->write_block(data,beg,len,bbtemp);
+    
     delete sh;
     delete sm;
     delete bh;
-    delete bbtemp;
     return s;
 }
 

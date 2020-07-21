@@ -44,12 +44,13 @@ struct LOBLocator{
     static Status Serialize(std::vector<uint8_t> &result, LOBLocator **ll);
     //将一段数据反序列化成一个loblocator结构
     static Status Deserialize(const std::vector<uint8_t> &input, LOBLocator *ll);
+    //指定lobid和lob类型来创建一个loblocator
     LOBLocator(uint32_t lobid, uint32_t t)
         :size(HEAD_SIZE),
         Locator_version(0x01),
         LOBID(lobid),
         type(t),
-        mode(0x01),
+        mode(0x10),
         LOB_version(0x01),
         data_size(0),
         LOB_checksum(0){}
