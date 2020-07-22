@@ -30,7 +30,8 @@ public:
     Status read_page(uint32_t id, uint32_t offset, vector<uint8_t> &data);
     //释放指定偏移的数据页
     Status free_page(uint32_t id, uint32_t offset);
-    
+    //获取一个没用过的段ID
+    uint32_t new_segid();
     static const uint32_t META_NUMS = BlockHead::FREE_SPACE / 8 - 1; //一个元数据文件中包含的地址数量，减一是因为还要存下一个元数据块的地址
     static const uint32_t PAGE_FREE_SPACE = BlockHead::FREE_SPACE; //页内可用空间大小
 private:
@@ -55,7 +56,7 @@ private:
 */
 struct SegHead{
 public:
-    uint32_t ID;//段的ID
+    uint32_t ID;//段的ID,一般也就是表的ID
     uint32_t meta_first_addr;//第一块元数据块的地址
     //内存段头创建，之后调用write写入
     SegHead(uint32_t id, uint32_t addr)

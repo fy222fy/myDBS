@@ -16,6 +16,7 @@ LOB/LOB.o : LOB/LOB.cpp
 
 
 clean :
+	rm datafile
 	rm *.o
 	rm Util/*.o
 	rm DataFile/*.o

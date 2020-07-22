@@ -366,3 +366,7 @@ Status VFS::free_page(uint32_t id, uint32_t offset){
     delete tempb;
     return s;
 }
+
+uint32_t VFS::new_segid(){
+    return nums;//段id递增
+}
