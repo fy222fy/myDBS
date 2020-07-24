@@ -1,8 +1,8 @@
 #include "VFS.h"
-VFS::VFS():is_active(false),nums(0){}
+VFS::VFS(Options *op):is_active(false),nums(0),op(op){}
 
 VFS* VFS::get_VFS(Options *op){//获得单例模式的VFS
-    static VFS vfs;
+    static VFS vfs(op);
     if(!vfs.is_active){//如果是首次打开，要先从文件中读取信息，或者创建文件
         if(op == nullptr){
             assert("首次调用vfs必须指定op");
@@ -15,6 +15,7 @@ VFS* VFS::get_VFS(Options *op){//获得单例模式的VFS
         else{
             DataFile::open_datafile(vfs.fname,op,&vfs.df);//打开数据文件
             vfs.read_seg_info();//从头部文件中读入所有的段信息
+            vfs.is_active = true;
         }
     }
     return &vfs;
@@ -141,6 +142,7 @@ Status VFS::create_seg(uint32_t id){
     write_seg_head(bh,&sh);
     SegMeta sm;
     write_seg_meta(bh2,&sm);//写入一个空的元数据文件块
+    write_add_seg_info();//修改段信息结构了，所以要写入
     return s;
 }
 
@@ -212,10 +214,11 @@ Status VFS::append(uint32_t id, uint32_t &offset, const vector<uint8_t> &data,ui
     //首先遍历已分配的页，如果有就分配出去
     //如果没有，就找到最后，新建一个页
     bool state = false;
+    uint32_t cur_offset = 0;
     while(true){
-        for(int i = 0; i < META_NUMS; i++){
+        for(int i = 0; i < META_NUMS; i++,cur_offset++){
             if(sm->M[i].first == 0x00){//找到了空的页
-                offset = i;
+                offset = cur_offset;
                 df->alloc_block(&p_bh);
                 sm->M[i].second = p_bh->address;
                 sm->M[i].first = 0x01;
@@ -232,6 +235,7 @@ Status VFS::append(uint32_t id, uint32_t &offset, const vector<uint8_t> &data,ui
         else break;//否则就说明所有已分配的页都查看过了，并且没有
     }
     if(!state){//如果还是没有找到，则可以申请新的元数据信息块了
+        offset = cur_offset;
         sm->if_have_next = 0x01;
         BlockHandle *bh2;
         df -> alloc_block(&bh2);
@@ -288,7 +292,7 @@ Status VFS::write_page(uint32_t id, uint32_t offset, const vector<uint8_t> &data
     //现在已经定位到了最后一个块 sm bh
     if(sm->M[own_offset].first == 0x01){ //表明该页已经在使用
         BlockHandle *bhtmp = new BlockHandle(sm->M[own_offset].second);
-        df->write_block(data,beg,len,bh);//覆盖写入
+        df->write_block(data,beg,len,bhtmp);//覆盖写入
         delete bhtmp;
     }
     else{

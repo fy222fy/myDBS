@@ -149,8 +149,11 @@ int test_lob(){
     lob->create_lobseg(lob_seg_id);//创建一个lob段
     LOBLocator *ll;
     lob->create_locator(&ll,lob_seg_id);
-    vector<uint8_t> data(60,0x64);
+    vector<uint8_t> data(800,0x64);
     lob->append(ll,data);
+    vector<uint8_t> data2(4000,0x65);
+    lob->append(ll,data2);
+    return 0;
 }
 
 int main(){

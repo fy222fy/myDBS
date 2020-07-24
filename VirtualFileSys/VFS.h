@@ -36,7 +36,8 @@ public:
     static const uint32_t PAGE_FREE_SPACE = BlockHead::FREE_SPACE; //页内可用空间大小
 private:
     static VFS *vfs;//单例引用
-    VFS();//没用的构造函数
+    Options *op;
+    VFS(Options *op);//没用的构造函数
     Status read_seg_info();//从文件头部读所有的段信息
     Status write_add_seg_info();//将段的头部信息全部写到数据文件头部
     Status read_seg_head(BlockHandle *bh, SegHead **sh);//从bh中读出段头
