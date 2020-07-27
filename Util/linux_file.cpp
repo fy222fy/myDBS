@@ -78,6 +78,7 @@ Status LinuxFile::Write(uint64_t offset, const std::vector<uint8_t> &data, uint3
     }
     file->clear();
     file->seekp(offset,std::ios::beg);
+    
     for(int i = beg; i < len; i++){
         *file << data[i];
     }

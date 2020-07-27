@@ -144,20 +144,28 @@ int test_lob(){
     Env *env = new LinuxEnv();
     Options *op = new Options(env);
     VFS *vfs = VFS::get_VFS(op);
-    LOB *lob = new LOB();
+    //LOBimpl *lob = new LOBimpl();
     uint32_t lob_seg_id;
-    lob->create_lobseg(lob_seg_id);//创建一个lob段
+    //lob->create_lobseg(lob_seg_id);//创建一个lob段
     LOBLocator *ll;
-    lob->create_locator(&ll,lob_seg_id);
+    //lob->create_locator(&ll,lob_seg_id);
     vector<uint8_t> data(800,0x64);
-    lob->append(ll,data);
+    //lob->append(ll,data);
     vector<uint8_t> data2(4000,0x65);
-    lob->append(ll,data2);
+    //lob->append(ll,data2);
     return 0;
 }
 
 int main(){
-    test_lob();
+    //test_lob();
+    char *a = (char *)malloc(4 * sizeof(char));
+    a[0] = '1';
+    a[1] = '2';
+    a[2] = '3';
+    a[3] = '4';
+    char *b = a;
+    cout<<b<<endl;
+    free(b);
     exit(1);
 }
 

@@ -8,8 +8,8 @@
 
 //locator定义，拿着locator，可以对lob进行所有的操作
 struct LOBLocator{
-    uint32_t size;//locator的大小，B为单位
     uint8_t Locator_version;//locator的版本号，用于未来升级
+    uint32_t size;//locator的大小，B为单位
     uint32_t LOBID;//LOB ID
     uint32_t segID;//所在的段的id
     uint32_t LOB_version;//该LOB版本
