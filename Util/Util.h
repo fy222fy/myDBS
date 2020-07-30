@@ -16,8 +16,8 @@ uint8_t *int32_to_int8(uint32_t a);
  * v：输入的任意长数组
  * i：开始转换的位置
 */
-uint32_t int8_to_int32(const std::vector<uint8_t> &v, int i);
+uint32_t int8_to_int32(const uint8_t *v, int i);
 
 //通用的数据校验和计算
-uint32_t checksum_data(const std::vector<uint8_t> data, uint32_t beg, uint32_t len);
+uint32_t checksum_data(const uint8_t *data, uint32_t beg, uint32_t len);
 #endif //

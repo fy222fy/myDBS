@@ -2,6 +2,10 @@
 #define LINUX_FILE
 #include "../include/env.h"
 #include "../include/status.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <string>
 #include <vector>
 #include <fstream>
@@ -13,14 +17,14 @@ using namespace std;
 class LinuxFile: public RWFile{
 private:
     std::string filename;
-    std::fstream *file;
+    int fd;
 public:
     //在不打开文件流的情况下创建一个空对象，在此之后必须执行open函数
     LinuxFile();
     //文件流未打开，使用该文件名创建一个RWfile对象
     LinuxFile(const std::string &fname);
     //正常使用该构造函数，给定文件流指针
-    LinuxFile(const std::string &fname, std::fstream *f);
+    LinuxFile(const std::string &fname, int fd);
     virtual ~LinuxFile();
     /**
      * 以指定文件名打开一个文件
@@ -32,17 +36,17 @@ public:
      * n：读取的长度
      * result：提取的数组
     */
-    virtual Status Read(uint64_t offset, size_t n, std::vector<uint8_t> &result);
+    virtual Status Read(uint64_t offset, size_t n, uint8_t *result);
     /**
      * 在文件末尾附加数据
     */
-    virtual Status Append(const std::vector<uint8_t> &data);
+    virtual Status Append(const uint8_t *data);
     /**
      * 在文件指定偏移写入数据
      * offset：指定偏移，以字节为单位B
      * data：提取的数组
     */
-    virtual Status Write(uint64_t offset, const std::vector<uint8_t> &result, uint32_t beg, uint32_t len);
+    virtual Status Write(uint64_t offset, const uint8_t *result, uint32_t len);
     /**
      * 将写入的文件刷到磁盘
     */

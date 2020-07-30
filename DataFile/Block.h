@@ -7,9 +7,7 @@
 
 #include <stdint.h>
 #include<iostream>
-#include<string>
 #include<fstream>
-#include<vector>
 #include "../include/env.h"
 
 /**

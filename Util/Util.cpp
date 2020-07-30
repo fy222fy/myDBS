@@ -9,11 +9,10 @@ uint8_t *int32_to_int8(uint32_t a){
     return temp;
 }
 
-uint32_t int8_to_int32(const std::vector<uint8_t> &v, int i){
-    assert(i + 3 < v.size());
+uint32_t int8_to_int32(const uint8_t *v, int i){
     return ((uint32_t) v[i] << 24) + ((uint32_t) v[i+1] << 16) + ((uint32_t) v[i+2] << 8) + ((uint32_t) v[i+3]);
 }
 
-uint32_t checksum_data(const std::vector<uint8_t> data, uint32_t beg, uint32_t len){
+uint32_t checksum_data(const uint8_t *data, uint32_t beg, uint32_t len){
     return 100341;
 }

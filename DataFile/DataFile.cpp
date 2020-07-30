@@ -43,7 +43,7 @@ bool DataFile::if_exist(string fname, Options *op){
     return op->env->if_exsist(fname);
 }
 
-Status DataFile::serialize_head(vector<uint8_t> &result){
+Status DataFile::serialize_head(uint8_t *result){
     Status s;
     uint8_t *temp = int32_to_int8(ID);
     result[0] = temp[0];
@@ -54,7 +54,7 @@ Status DataFile::serialize_head(vector<uint8_t> &result){
     return s;
 }
 
-Status DataFile::deserialize_head(const vector<uint8_t> &input){
+Status DataFile::deserialize_head(const uint8_t *input){
     Status s;
     ID = int8_to_int32(input,0);
     type = input[4];
@@ -63,18 +63,19 @@ Status DataFile::deserialize_head(const vector<uint8_t> &input){
 
 Status DataFile::read_head(){
     Status s;
-    vector<uint8_t> result;
+    uint8_t result[HEAD_SIZE];
     s = file->Read(0,HEAD_SIZE,result); //从文件中读取头部大小的数据
     s = deserialize_head(result); //将数据反序列化，获取头部
     return s;
 }
 
 
+
 Status DataFile::write_head(){
     Status s;
-    vector<uint8_t> result(HEAD_SIZE);
+    uint8_t result[HEAD_SIZE];
     s = serialize_head(result);
-    s = file->Write(0,result,0,result.size());
+    s = file->Write(0,result,HEAD_SIZE);
     return s;
 }
 
@@ -100,7 +101,7 @@ DataFile::~DataFile(){
 
 Status DataFile::read_block_head(BlockHandle *bh, BlockHead **bhead){
     Status s;
-    vector<uint8_t> result;
+    uint8_t result[BlockHead::HEAD_SIZE];
     s = file->Read(bh->address,BlockHead::HEAD_SIZE,result);
     *bhead = new BlockHead(true);
     (*bhead) -> if_free = result[0] == 0x02 ? false:true;
@@ -113,7 +114,7 @@ Status DataFile::read_block_head(BlockHandle *bh, BlockHead **bhead){
 Status DataFile::write_block_head(BlockHandle *bh, BlockHead *bhead){
     Status s;
     //序列化一下bhead
-    vector<uint8_t> data(BlockHead::HEAD_SIZE);
+    uint8_t data[BlockHead::HEAD_SIZE];
     data[0] = bhead->if_free == true ? 0x01 : 0x02;
     uint8_t *temp = int32_to_int8(bhead->used_space);
     data[1] = temp[0];
@@ -131,7 +132,7 @@ Status DataFile::write_block_head(BlockHandle *bh, BlockHead *bhead){
     data[11] = temp[2];
     data[12] = temp[3];
     //然后把数据写进去
-    s = file->Write(bh->address,data,0,data.size());
+    s = file->Write(bh->address,data,BlockHead::HEAD_SIZE);
     s = file->Flush();
     return s;
 }
@@ -161,8 +162,8 @@ Status DataFile::alloc_block(BlockHandle **pbh){
     BlockHead bhead(false);
     write_block_head(*pbh,&bhead);
     //然后直接先用0补齐块的内容，后续可能要优化这里
-    vector<uint8_t> tempdata(BlockHead::FREE_SPACE, 0x00);
-    file->Write((*pbh)->address + BlockHead::HEAD_SIZE,tempdata,0,tempdata.size());
+    uint8_t tempdata[BlockHead::FREE_SPACE, 0x00];
+    file->Write((*pbh)->address + BlockHead::HEAD_SIZE,tempdata,BlockHead::FREE_SPACE);
     s = file->Flush();
     //最后将这个分配出去的块加在空闲链表中
     (*free_map)[addr] = false;
@@ -180,17 +181,17 @@ Status DataFile::free_block(BlockHandle *bh){
     return s;
 }
 
-Status DataFile::write_block(const vector<uint8_t> &in_data, uint32_t beg, uint32_t len, BlockHandle *bh){//向表中写入一些数据
+Status DataFile::write_block(const uint8_t *in_data, uint32_t len, BlockHandle *bh){//向表中写入一些数据
     Status s;
     if(len > BlockHead::FREE_SPACE){
         s.FetalError("输入块的数据太大");
         return s;
     }    
     BlockHead bhead(false);
-    bhead.used_space = in_data.size();
+    bhead.used_space = len;
     s = write_block_head(bh,&bhead);
     if(!s.isok()) s.FetalError("数据块头写入文件失败");
-    s = file->Write(bh->address + BlockHead::HEAD_SIZE, in_data,beg,len);
+    s = file->Write(bh->address + BlockHead::HEAD_SIZE, in_data,len);
     s = file->Flush();
     if(!s.isok()) s.FetalError("数据块写入文件失败");
     return s;
@@ -203,7 +204,7 @@ Status DataFile::flush(){
     return s;
 }
 
-Status DataFile::read_block(BlockHandle *bh, vector<uint8_t> &result){
+Status DataFile::read_block(BlockHandle *bh, uint8_t *result){
     Status s;
     //首先读取头部信息，看看块到底是不是真的在用，以及数据部分的长度是多少
     BlockHead *bhead;

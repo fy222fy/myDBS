@@ -27,17 +27,17 @@ public:
      * n：读取的长度
      * result：提取的数组
     */
-    virtual Status Read(uint64_t offset, size_t n, std::vector<uint8_t> &result)=0;
+    virtual Status Read(uint64_t offset, size_t n, uint8_t *result)=0;
     /**
      * 在文件末尾附加数据
     */
-    virtual Status Append(const std::vector<uint8_t> &data)=0;
+    virtual Status Append(const uint8_t *data)=0;
     /**
      * 在文件指定偏移写入数据
      * offset：指定偏移，以字节为单位B
      * data：提取的数组
     */
-    virtual Status Write(uint64_t offset, const std::vector<uint8_t> &data, uint32_t beg, uint32_t len) = 0;
+    virtual Status Write(uint64_t offset, const uint8_t *data, uint32_t len) = 0;
     /**
      * 将写入的文件刷到磁盘
     */

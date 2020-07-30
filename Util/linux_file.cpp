@@ -17,20 +17,13 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <cassert>
-LinuxFile::LinuxFile():filename(""),file(NULL){}
-LinuxFile::LinuxFile(const std::string &fname)
-    :filename(fname){
-    file = new std::fstream();
-    file->open(fname, std::ios::in|std::ios::out|std::ios::binary);
-    assert(file && "文件打开失败");
-}
+LinuxFile::LinuxFile():filename(""),fd(-1){}
 
-LinuxFile::LinuxFile(const std::string &fname,std::fstream *f)
-    :filename(fname),file(f){}
+LinuxFile::LinuxFile(const std::string &fname,int ffd)
+    :filename(fname),fd(ffd){}
 
 LinuxFile::~LinuxFile(){
-    file->close();
-    delete file;
+    close(fd);
 }
 
 /**
@@ -39,50 +32,43 @@ LinuxFile::~LinuxFile(){
 Status LinuxFile::Open(std::string fname){ 
     Status s;
     filename = fname;
-    std::ifstream fin(fname);
-    if(!fin) s.FetalError("文件还不存在就调用了系统的打开文件操作，请先使用env创建文件");
-    if(file) s.FetalError("如果使用open函数，请不要使用带文件指针f的构造函数");
-    fin.close();
-    file = new std::fstream(fname, std::ios::in|std::ios::out|std::ios::binary);
-    if(!file) s.FetalError("系统错误，文件打开失败");
+    if(fd != -1) s.FetalError("该数据文件已经打开，使用有误。");
+    int fd = open(filename.c_str(),O_RDWR);
+    if(fd == -1){
+        s.FetalError("文件打开失败，可能是还没有创建文件");
+    } 
     return s;
 }
 /*
  * 在指定偏移处，从文件中读取n长度的数据
 */
-Status LinuxFile::Read(uint64_t offset, size_t n, std::vector<uint8_t> &result){
+Status LinuxFile::Read(uint64_t offset, size_t n, uint8_t *result){
     Status s;
-    if(result.size() != 0) result.clear();
-    file->clear();
-    file->seekg(offset,std::ios::beg);
-    char temp[n];
-    file->read(temp,n);
-    result.insert(result.begin(),temp,temp+n);
-    if(!file) s.FetalError("文件重定位错误或写入错误");
+    if(fd == -1){
+        s.FetalError("系统读取错误，文件还未打开");
+    }
+    int ret = read(fd,result,n);
+    if(ret == 0) s.FetalError("系统读取错误，读到文件尾");
+    if(ret == -1) s.FetalError("系统读取错误");
     return s;
 }
 /**
  * 附加数据
 */
-Status LinuxFile::Append(const std::vector<uint8_t> &data){
+Status LinuxFile::Append(const uint8_t *data){
     Status s;
     s.FetalError("该函数还未实现，请勿调用");
     return s;
 }
 
-Status LinuxFile::Write(uint64_t offset, const std::vector<uint8_t> &data, uint32_t beg, uint32_t len){
+Status LinuxFile::Write(uint64_t offset, const uint8_t *data, uint32_t len){
     Status s;
-    if(!(*file)){
-        file->open(filename.c_str(),std::ios::in|std::ios::out|std::ios::binary);
-        if(!*file) s.FetalError("系统错误，文件打开失败");     
+    if(fd == -1){
+        s.FetalError("系统写入错误，文件还未打开");     
     }
-    file->clear();
-    file->seekp(offset,std::ios::beg);
-    
-    for(int i = beg; i < len; i++){
-        *file << data[i];
-    }
-    if(!*file) s.FetalError("文件写入失败");
+    lseek(fd,offset,SEEK_SET);//将文件指针移动到offset处
+    ssize_t write_len = write(fd,data,len);
+    if(write_len != len) s.FetalError("系统写入出错，可能是磁盘空间已满或者是超出文件最大限制");
     return s;
 }
 
@@ -91,15 +77,8 @@ Status LinuxFile::Write(uint64_t offset, const std::vector<uint8_t> &data, uint3
 */
 Status LinuxFile::Flush(){
     Status s;
-    *file << std::flush;
-    if(!*file) s.FetalError("文件flush失败");
+    if(fsync(fd) != 0) s.FetalError("文件sync失败");
     return s;
-    /*
-    Status s;
-    if(fflush(this->file) != 0) s = SError("文件flush失败");
-    if(fsync(fileno(this->file)) != 0) s = SError("文件sync失败");
-    return s;
-    */
 }
 /**
  * 同步
@@ -114,12 +93,11 @@ Status LinuxFile::Sync(){
  * 关闭文件
 */
 void LinuxFile::Close(){
-    file->close();
+    close(fd);
 }
 
 uint64_t LinuxFile::Size(){
-    file->seekg(0,file->end);
-    return file->tellg();
+    return 0;
 }
 
 
@@ -127,14 +105,9 @@ uint64_t LinuxFile::Size(){
 
 Status LinuxEnv::NewFile(const std::string &filename, RWFile **f){
     Status s;
-    std::ifstream fin(filename);
-    if(fin) s.Warning("文件已经存在，忽略该问题并覆盖该文件");
-    fin.close();
-    std::fstream *fs = new std::fstream(filename, std::ios::out|std::ios::binary);
-    if(!(*fs)) s.FetalError("文件在创建后没有成功打开");
-    fs->close();
-    fs = new std::fstream(filename, std::ios::in|std::ios::out|std::ios::binary);
-    *f = new LinuxFile(filename, fs);
+    int fd = open(filename.c_str(),O_CREAT|O_EXCL,S_IRWXU);
+    if(fd == -1) s.FetalError("文件已经存在，请检查使用");
+    *f = new LinuxFile(filename.c_str(),fd);
     return s;
 }
 

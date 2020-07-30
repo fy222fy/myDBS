@@ -58,7 +58,7 @@ public:
      * 这里不做缓存，直接写入文件的对应位置
      * 除了上层用户写入的数据以外，还要把块头信息一起写入
     */
-    Status write_block(const vector<uint8_t> &data, uint32_t beg, uint32_t len, BlockHandle *bb);
+    Status write_block(const uint8_t* data, uint32_t len, BlockHandle *bb);
     /**
      * 将缓冲区内的所有数据刷到磁盘上
      * 即调用文件接口的函数写文件
@@ -68,7 +68,7 @@ public:
      * 根据给定的物理地址，读取一个块到内存中并返回
      * 注意这里是从文件中读取的
     */
-    Status read_block(BlockHandle *bh, vector<uint8_t> &result);
+    Status read_block(BlockHandle *bh, uint8_t *result);
     //为第一次打开文件的用户提供一个首要数据的偏移
     Status get_first_bh(BlockHandle **bh);
     //获得当前地址的下一个地址，这两个函数今后不一定使用
@@ -86,9 +86,9 @@ private:
     //初始化空闲位图
     Status init_map();
     //将头部信息序列化
-    Status serialize_head(vector<uint8_t> &result);
+    Status serialize_head(uint8_t *result);
     //将序列化好的头部信息反序列化成头部状态
-    Status deserialize_head(const vector<uint8_t> &input);
+    Status deserialize_head(const uint8_t *input);
     //从文件中读取头部数据
     Status read_head();
     //将头部数据写入头部
