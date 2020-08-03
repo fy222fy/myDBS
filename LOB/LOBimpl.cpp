@@ -31,9 +31,9 @@ Status LOBimpl::create_lobseg(uint32_t &seg_id){
     return s;
 }
 
-Status LOBimpl::append(LOBLocator *ll, const std::vector<uint8_t> &data){
+Status LOBimpl::append(LOBLocator *ll, const uint8_t *data, uint64_t len){
     Status s;
-    uint32_t newlen = data.size() + ll->data_size;
+    uint64_t newlen = data.size() + ll->data_size;
     if(newlen > LOBimpl::OUTLINE_3_MAX_SIZE){
         s.FetalError("插入的数据超过最大限制");
         return s;
@@ -50,7 +50,7 @@ Status LOBimpl::append(LOBLocator *ll, const std::vector<uint8_t> &data){
             ll->lpas.clear();
             temp_data.insert(temp_data.end(),data.begin(),data.end());
             uint32_t i = 0,beg = 0;
-            uint32_t lpa,lhpa,lhipa;
+            uint64_t lpa,lhpa,lhipa;
             LHP *lhp;
             LHIP *lhip;
             for(;beg < temp_data.size(); i++,beg+=LOB_PAGE_SIZE){
@@ -117,15 +117,15 @@ Status LOBimpl::append(LOBLocator *ll, const std::vector<uint8_t> &data){
     }
     else if(ll->mode == 0x11){
         //首先处理最后一个块不满的问题
-        uint32_t last = LOB_PAGE_SIZE - (ll->data_size % LOB_PAGE_SIZE);
-        uint32_t last_lpa = ll->lpas[ll->lpa_nums-1];
+        uint64_t last = LOB_PAGE_SIZE - (ll->data_size % LOB_PAGE_SIZE);
+        uint64_t last_lpa = ll->lpas[ll->lpa_nums-1];
         vector<uint8_t> output;
         read_lobpage(ll->segID,last_lpa,output);
         output.insert(output.end(),data.begin(),data.begin()+last);
         write_lobpage(ll->segID,last_lpa,output,0,output.size());
         //然后开始正常操作
-        uint32_t i = ll->lpa_nums,beg = last;
-        uint32_t lpa,lhpa,lhipa;
+        uint64_t i = ll->lpa_nums,beg = last;
+        uint64_t lpa,lhpa,lhipa;
         LHP *lhp;
         LHIP *lhip;
         for(;beg < data.size(); i++,beg+=LOB_PAGE_SIZE){
@@ -191,18 +191,18 @@ Status LOBimpl::append(LOBLocator *ll, const std::vector<uint8_t> &data){
     }
     else if(ll->mode == 0x12){
         //首先处理最后一个块不满的问题
-        uint32_t last = LOB_PAGE_SIZE - (ll->data_size % LOB_PAGE_SIZE);
-        uint32_t lpa_all_nums = (ll->data_size / LOB_PAGE_SIZE) + 1;
+        uint64_t last = LOB_PAGE_SIZE - (ll->data_size % LOB_PAGE_SIZE);
+        uint64_t lpa_all_nums = (ll->data_size / LOB_PAGE_SIZE) + 1;
         LHP *lhp;
         read_LHP(ll->segID,ll->lhpa,&lhp);//读出lhp结构来
-        uint32_t last_lpa = lhp->M[lpa_all_nums - 1];
+        uint64_t last_lpa = lhp->M[lpa_all_nums - 1];
         vector<uint8_t> output;
         read_lobpage(ll->segID,last_lpa,output);
         output.insert(output.end(),data.begin(),data.begin()+last);
         write_lobpage(ll->segID,last_lpa,output,0,output.size());
         //然后开始正常操作
-        uint32_t i = lhp->nums,beg = last;
-        uint32_t lpa,lhpa,lhipa;
+        uint64_t i = lhp->nums,beg = last;
+        uint64_t lpa,lhpa,lhipa;
         LHIP *lhip;
         for(;beg < data.size(); i++,beg+=LOB_PAGE_SIZE){
             if(lhp->nums < LHP::MAX_LPA){//一个LHP勉强还够
@@ -248,20 +248,20 @@ Status LOBimpl::append(LOBLocator *ll, const std::vector<uint8_t> &data){
     }
     else if(ll->mode == 0x13){
        //首先处理最后一个块不满的问题
-        uint32_t last = LOB_PAGE_SIZE - (ll->data_size % LOB_PAGE_SIZE);
-        uint32_t lpa_all_nums = (ll->data_size / LOB_PAGE_SIZE) + 1;
+        uint64_t last = LOB_PAGE_SIZE - (ll->data_size % LOB_PAGE_SIZE);
+        uint64_t lpa_all_nums = (ll->data_size / LOB_PAGE_SIZE) + 1;
         LHIP *lhip;
         read_LHIP(ll->segID,ll->lhpa,&lhip);
         LHP* lhp;
         read_LHP(ll->segID,lhip->read_last_lhpa(),&lhp);//读出lhp结构来
-        uint32_t last_lpa = lhp->M[lpa_all_nums];
+        uint64_t last_lpa = lhp->M[lpa_all_nums];
         vector<uint8_t> output;
         read_lobpage(ll->segID,last_lpa,output);
         output.insert(output.end(),data.begin(),data.begin()+last);
         write_lobpage(ll->segID,last_lpa,output,0,LOB_PAGE_SIZE);
         //然后正常操作
-        uint32_t i = lhip->nums,beg = last;
-        uint32_t lpa,lhpa,lhipa;
+        uint64_t i = lhip->nums,beg = last;
+        uint64_t lpa,lhpa,lhipa;
         create_LHP(&lhp);
         for(;beg < data.size(); i++,beg+=LOB_PAGE_SIZE){
             if(lhp->nums < LHP::MAX_LPA){
@@ -289,7 +289,7 @@ Status LOBimpl::append(LOBLocator *ll, const std::vector<uint8_t> &data){
     }
     
 }
-Status LOBimpl::write(LOBLocator *ll, uint32_t data_off, const std::vector<uint8_t> &data){
+Status LOBimpl::write(LOBLocator *ll, uint64_t data_off, const uint8_t *data){
     Status s;
     if(data_off > ll->data_size) s.FetalError("插入数据的位置不应该大于数据本身大小");
     if(data_off == ll->data_size) append(ll,data);
@@ -312,12 +312,12 @@ Status LOBimpl::write(LOBLocator *ll, uint32_t data_off, const std::vector<uint8
     }
     return s;
 }
-Status LOBimpl::read(LOBLocator *ll, uint32_t amount, uint32_t data_off, std::vector<uint8_t> &result){
+Status LOBimpl::read(LOBLocator *ll, uint64_t amount, uint64_t data_off, uint8_t *result){
     Status s;
     
     return s;
 }
-Status LOBimpl::erase(LOBLocator *ll, uint32_t amount, uint32_t data_off){
+Status LOBimpl::erase(LOBLocator *ll, uint64_t amount, uint64_t data_off){
     Status s;
     return s;
 }
@@ -331,7 +331,7 @@ uint32_t LOBimpl::checksum(LOBLocator *ll){
     return 0x01;
 }
 
-Status LOBimpl::create_lobpage(uint32_t segid, uint32_t &offset, const vector<uint8_t> &data, uint32_t beg, uint32_t len){
+Status LOBimpl::create_lobpage(uint32_t segid, uint64_t &offset, const uint8_t *data, uint64_t len){
     Status s;
     VFS *vfs = VFS::get_VFS();
     if(data.size() - beg < len) len = data.size() - beg;
@@ -342,10 +342,8 @@ Status LOBimpl::create_lobpage(uint32_t segid, uint32_t &offset, const vector<ui
     s = vfs->append(segid,offset,tdta,0,tdta.size());
     return s;
 }
-//Status LOBimpl::append_lobpage(uint32_t &offset, const vector<uint8_t> &data, uint32_t beg, uint32_t len){
 
-//}
-Status LOBimpl::write_lobpage(uint32_t segid, uint32_t offset, const vector<uint8_t> &data, uint32_t beg, uint32_t len){
+Status LOBimpl::write_lobpage(uint32_t segid, uint64_t offset, const uint8_t *data, uint64_t len){
     Status s;
     VFS *vfs = VFS::get_VFS();
     if(data.size() - beg < len) len = data.size() - beg;
@@ -356,7 +354,7 @@ Status LOBimpl::write_lobpage(uint32_t segid, uint32_t offset, const vector<uint
     s = vfs->write_page(segid,offset,tdta,0,tdta.size());
     return s;
 }
-Status LOBimpl::read_lobpage(uint32_t segid, uint32_t offset, vector<uint8_t> &output){
+Status LOBimpl::read_lobpage(uint32_t segid, uint64_t offset, uint8_t *output){
     Status s;
     VFS *vfs = VFS::get_VFS();
     vector<uint8_t> temp;
@@ -372,7 +370,7 @@ Status LOBimpl::create_LHP(LHP **lhp){
 //Status LOBimpl::append_LHP(uint32_t segid, uint32_t &offset, LHP *lhp){
 
 //}
-Status LOBimpl::write_LHP(uint32_t segid, uint32_t &offset, LHP *lhp){
+Status LOBimpl::write_LHP(uint32_t segid, uint64_t &offset, LHP *lhp){
     Status s;
     VFS *vfs = VFS::get_VFS();
     vector<uint8_t> result;
@@ -380,7 +378,7 @@ Status LOBimpl::write_LHP(uint32_t segid, uint32_t &offset, LHP *lhp){
     s = vfs->append(segid,offset,result,0,result.size());
     return s;
 }
-Status LOBimpl::read_LHP(uint32_t segid, uint32_t offset, LHP **lhp){
+Status LOBimpl::read_LHP(uint32_t segid, uint64_t offset, LHP **lhp){
     Status s;
     VFS *vfs = VFS::get_VFS();
     vector<uint8_t> data;
@@ -394,10 +392,8 @@ Status LOBimpl::create_LHIP(LHIP **lhip){
     *lhip = new LHIP();
     return s;
 }
-//Status LOBimpl::append_LHIP(uint32_t segid, uint32_t &offset, LHIP *lhip){
 
-//}
-Status LOBimpl::write_LHIP(uint32_t segid, uint32_t &offset, LHIP *lhip){
+Status LOBimpl::write_LHIP(uint32_t segid, uint64_t &offset, LHIP *lhip){
     Status s;
     VFS *vfs = VFS::get_VFS();
     vector<uint8_t> result;
@@ -405,7 +401,7 @@ Status LOBimpl::write_LHIP(uint32_t segid, uint32_t &offset, LHIP *lhip){
     s = vfs->append(segid,offset,result,0,result.size());
     return s;
 }
-Status LOBimpl::read_LHIP(uint32_t segid, uint32_t offset, LHIP **lhip){
+Status LOBimpl::read_LHIP(uint32_t segid, uint64_t offset, LHIP **lhip){
     Status s;
     VFS *vfs = VFS::get_VFS();
     vector<uint8_t> data;

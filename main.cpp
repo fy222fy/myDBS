@@ -100,7 +100,7 @@ int test_vfs_crerate_seg(int id){
 }
 
 int test_vfs_append(uint32_t id){
-    uint32_t offset;
+    uint64_t offset;
     uint8_t r = (uint8_t)rand();//随机一个输入数据
     cout << r <<endl;
     uint8_t data[8]={r,0x55,0x56,0x57,0x20,0x20,0x21,0x59};
@@ -139,7 +139,12 @@ void a_single_fun_to_test_VFS(){
     test_vfs_read(1);
     test_vfs_free_page(1);
     test_vfs_write(1);
+    test_vfs_append(1);
     test_vfs_free_seg(1);
+    test_vfs_crerate_seg(2);
+    test_vfs_crerate_seg(1);
+    test_vfs_append(1);
+    test_vfs_append(2);
 }
 
 int test_lob(){

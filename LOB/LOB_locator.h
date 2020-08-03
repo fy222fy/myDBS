@@ -15,13 +15,13 @@ struct LOBLocator{
     uint32_t LOB_version;//该LOB版本
     uint32_t type;//LOB类型
     uint8_t mode;//LOB存储方式
-    uint32_t data_size;//LOB数据部分的大小
+    uint64_t data_size;//LOB数据部分的大小
     uint32_t LOB_checksum;//校验和
 
-    std::vector<uint8_t> data;//行内存的真实数据
+    uint8_t *data;//行内存的真实数据
     uint32_t lpa_nums;//保存行内lpa的数量
     std::vector<uint32_t> lpas; 
-    uint32_t lhpa;//保存lhpa或者lhipa，根据类型决定
+    uint64_t lhpa;//保存lhpa或者lhipa，根据类型决定
     
     static const uint32_t HEAD_SIZE = sizeof(size) + sizeof(Locator_version) +
         sizeof(LOBID) + sizeof(LOB_version) + sizeof(type) + sizeof(mode) + 
@@ -44,7 +44,7 @@ struct LOBLocator{
         data_size(0),
         LOB_checksum(0){}
     ~LOBLocator();  
-    void update_head(uint32_t lsize, uint8_t lmode, uint32_t dsize, uint32_t check_s){
+    void update_head(uint32_t lsize, uint8_t lmode, uint64_t dsize, uint32_t check_s){
         size = lsize;
         mode = lmode;
         data_size = dsize;

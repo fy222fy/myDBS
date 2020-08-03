@@ -22,7 +22,7 @@ using namespace std;
 struct DataFile{ //数据文件的结构
 public:
     const static uint32_t HEAD_SIZE = 16; //设置头部的初始大小
-    const static uint32_t DF_MAX_SIZE = 1000000;//设置数据文件最大长度
+    const static uint64_t DF_MAX_SIZE = 1000000;//设置数据文件最大长度
     /**
      * 如果当前还不存在数据文件，调用该函数
      * 以给定文件名创建一个数据文件，并返回该数据文件指针
@@ -58,7 +58,7 @@ public:
      * 这里不做缓存，直接写入文件的对应位置
      * 除了上层用户写入的数据以外，还要把块头信息一起写入
     */
-    Status write_block(const uint8_t* data, uint32_t len, BlockHandle *bb);
+    Status write_block(const uint8_t* data, uint64_t len, BlockHandle *bb);
     /**
      * 将缓冲区内的所有数据刷到磁盘上
      * 即调用文件接口的函数写文件
@@ -80,7 +80,7 @@ private:
     string filename;//文件名
     uint32_t ID;//数据文件唯一编号
     uint8_t type;//数据文件类型，目前只考虑普通用户数据文件
-    map<uint32_t,bool> *free_map; //块空闲位图，块地址-是否空闲，这是从文件中读出来的    
+    map<uint64_t,bool> *free_map; //块空闲位图，块地址-是否空闲，这是从文件中读出来的    
     //以文件指针和文件名来构造数据文件对象
     DataFile(RWFile *f, string fname);
     //初始化空闲位图

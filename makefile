@@ -17,7 +17,8 @@ VirtualFileSys/VFS.o : VirtualFileSys/VFS.cpp
 
 
 clean :
-	rm datafile
+	rm run
+	rm myFile
 	rm *.o
 	rm Util/*.o
 	rm DataFile/*.o

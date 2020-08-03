@@ -27,7 +27,7 @@ struct BlockHead{
     uint32_t block_size;//块的整体大小，这个部分是固定的
     uint32_t in_offset; //数据在该宏块中的偏移，最初这里设置是固定的。
 
-    const static uint32_t MAX_SIZE = 80;
+    const static uint32_t MAX_SIZE = 160;
     const static uint32_t HEAD_SIZE = 16;
     const static uint32_t FREE_SPACE = MAX_SIZE - HEAD_SIZE;
 
@@ -48,9 +48,9 @@ public:
     /**
      * 用一个已有的地址来初始化这个handle
     */
-    BlockHandle(uint32_t addr):address(addr){}
+    BlockHandle(uint64_t addr):address(addr){}
     ~BlockHandle(){}
-    uint32_t address; //物理地址
+    uint64_t address; //物理地址
 };
 
 #endif /**/

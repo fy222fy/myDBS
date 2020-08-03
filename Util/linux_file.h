@@ -47,7 +47,7 @@ public:
      * offset：指定偏移，以字节为单位B
      * data：提取的数组
     */
-    virtual Status Write(uint64_t offset, const uint8_t *result, uint32_t len);
+    virtual Status Write(uint64_t offset, const uint8_t *result, uint64_t len);
     /**
      * 将写入的文件刷到磁盘
     */

@@ -35,6 +35,7 @@
         "numeric": "cpp",
         "bitset": "cpp",
         "random": "cpp",
-        "ctime": "cpp"
+        "ctime": "cpp",
+        "cstring": "cpp"
     }
 }

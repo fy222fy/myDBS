@@ -81,7 +81,7 @@ Status DataFile::write_head(){
 
 Status DataFile::init_map(){
     Status s;
-    free_map = new map<uint32_t,bool>;//声明位图
+    free_map = new map<uint64_t,bool>;//声明位图
     for(uint32_t i = HEAD_SIZE; i < file->Size(); i += BlockHead::MAX_SIZE){
         BlockHandle bh(i);
         BlockHead *bhead;
@@ -181,7 +181,7 @@ Status DataFile::free_block(BlockHandle *bh){
     return s;
 }
 
-Status DataFile::write_block(const uint8_t *in_data, uint32_t len, BlockHandle *bh){//向表中写入一些数据
+Status DataFile::write_block(const uint8_t *in_data, uint64_t len, BlockHandle *bh){//向表中写入一些数据
     Status s;
     if(len == 0){
         s.FetalError("输入数据为空，写入是没有意义的");

@@ -62,7 +62,7 @@ Status LinuxFile::Append(const uint8_t *data){
     return s;
 }
 
-Status LinuxFile::Write(uint64_t offset, const uint8_t *data, uint32_t len){
+Status LinuxFile::Write(uint64_t offset, const uint8_t *data, uint64_t len){
     Status s;
     if(fd == -1){
         s.FetalError("系统写入错误，文件还未打开");     

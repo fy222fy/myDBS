@@ -18,6 +18,9 @@ uint8_t *int32_to_int8(uint32_t a);
 */
 uint32_t int8_to_int32(const uint8_t *v, int i);
 
+uint8_t *int64_to_int8(uint64_t a);
+uint64_t int8_to_int64(const uint8_t *v, int i);
+
 //通用的数据校验和计算
 uint32_t checksum_data(const uint8_t *data, uint32_t beg, uint32_t len);
 #endif //
