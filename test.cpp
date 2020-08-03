@@ -6,11 +6,11 @@
 using namespace std;
 
 int main(){
-    //test_lob();
-    char *a;
-    read(&a);
-    cout<<a[0]<<endl;
-    exit(1);
+    int fd = open("datafile",O_CREAT|O_EXCL|O_RDWR,S_IRWXU);
+    uint8_t data[3] = {0x56,0x57,0x59};
+    int b = write(fd,data,3);
+    int a = close(fd);
+    return 0;
 }
 
 

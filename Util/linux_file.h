@@ -18,6 +18,7 @@ class LinuxFile: public RWFile{
 private:
     std::string filename;
     int fd;
+    uint64_t size;//文件大小
 public:
     //在不打开文件流的情况下创建一个空对象，在此之后必须执行open函数
     LinuxFile();

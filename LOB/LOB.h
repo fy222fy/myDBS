@@ -55,7 +55,7 @@ struct LHP
         M.emplace_back(lpa);
         nums++;
     }//加入一个lpa
-    void Serialize(vector<uint8_t> &result){
+    void Serialize(uint8_t *result){
         uint8_t *temp = int32_to_int8(nums);
         for(int i = 0; i < 4;i++) result.emplace_back(temp[i]);
         temp = int32_to_int8(checksum);
@@ -65,7 +65,7 @@ struct LHP
             for(int i = 0; i < 4;i++) result.emplace_back(temp[i]);
         }
     }
-    void Deserialize(const vector<uint8_t> &input){
+    void Deserialize(const uint8_t *input){
         int it = 0;
         nums = int8_to_int32(input,it);
         it+=4;

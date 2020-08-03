@@ -1,0 +1,9 @@
+obj = test.o 
+run : $(obj)
+	g++ -g -o run $(obj) -std=c++11
+test.o : test.cpp
+	g++ -g -c test.cpp -o test.o -std=c++11
+
+clean :
+	rm *.o
+	rm datafile

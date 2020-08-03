@@ -29,11 +29,9 @@ Status VFS::read_seg_info(){
     Status s;
     BlockHandle *bh;
     df->get_first_bh(&bh);//获取第一个bh
-    vector<uint8_t> result;
+    uint8_t result[BlockHead::FREE_SPACE];
     df -> read_block(bh,result);//先读出来
-    if(result.size() != 0){//如果没读出东西来
-        nums = int8_to_int32(result,0);
-    }
+    nums = int8_to_int32(result,0);
     int j = 8;
     for(int i = 0; i < nums; i++,j+=8){
         uint32_t tmp_id = int8_to_int32(result,j);
@@ -48,7 +46,7 @@ Status VFS::write_add_seg_info(){
     Status s;
     BlockHandle *bh;
     df->get_first_bh(&bh);//获取第一个bh
-    vector<uint8_t> input(BlockHead::FREE_SPACE,0x00);
+    uint8_t input[BlockHead::FREE_SPACE] = {0};
     uint8_t *temp = int32_to_int8(M.size());
     for(int i = 0; i< 4;i++) input[i] = temp[i];
     int findex =8;
@@ -60,7 +58,7 @@ Status VFS::write_add_seg_info(){
         for(int i = 0; i< 4;i++) input[findex+i] = temp[i];
         findex += 4;
     }
-    df -> write_block(input,0,input.size(),bh);
+    df -> write_block(input,BlockHead::FREE_SPACE,bh);
     delete temp;
     delete bh;
     return s;
@@ -68,9 +66,8 @@ Status VFS::write_add_seg_info(){
 
 Status VFS::read_seg_head(BlockHandle *bh, SegHead **sh){
     Status s;
-    vector<uint8_t> result;
+    uint8_t result[BlockHead::FREE_SPACE];
     df->read_block(bh,result);//先读出来
-    if(result.size() == 0) s.FetalError("头部分未赋值");
     *sh = new SegHead();
     (*sh)->ID = int8_to_int32(result,0);//反序列ID
     (*sh)->meta_first_addr = int8_to_int32(result,4);//反序列首元数据地址
@@ -79,12 +76,12 @@ Status VFS::read_seg_head(BlockHandle *bh, SegHead **sh){
 
 Status VFS::write_seg_head(BlockHandle *bh, SegHead *sh){
     Status s;
-    vector<uint8_t> result(BlockHead::FREE_SPACE,0x00);
+    uint8_t result[BlockHead::FREE_SPACE] = {0};
     uint8_t *temp = int32_to_int8(sh->ID);//首先写入ID
     for(int i = 0; i < 4; i++) result[i] = temp[i];
     temp = int32_to_int8(sh->meta_first_addr);
     for(int i = 0; i < 4; i++) result[4 + i] = temp[i];
-    df->write_block(result,0,result.size(),bh);
+    df->write_block(result,BlockHead::FREE_SPACE,bh);
     delete temp;
     return s;
 }
@@ -92,11 +89,8 @@ Status VFS::write_seg_head(BlockHandle *bh, SegHead *sh){
 Status VFS::read_seg_meta(BlockHandle *bh, SegMeta **sm){
     Status s;
     *sm = new SegMeta();
-    vector<uint8_t> result;
+    uint8_t result[BlockHead::FREE_SPACE];
     df->read_block(bh,result);//读取出这个块的所有的meta
-    if(result.size() == 0){
-        s.FetalError("没有成功从块中读取出任何元数据信息");
-    }
     (*sm) ->if_have_next = int8_to_int32(result,0);
     (*sm)->next_meta_addr = int8_to_int32(result,4);
     int j = 8;
@@ -110,7 +104,7 @@ Status VFS::read_seg_meta(BlockHandle *bh, SegMeta **sm){
 
 Status VFS::write_seg_meta(BlockHandle *bh, SegMeta *sm){
     Status s;
-    vector<uint8_t> result(BlockHead::FREE_SPACE,0x00);
+    uint8_t result[BlockHead::FREE_SPACE] = {0};
     uint8_t *temp = int32_to_int8(sm->if_have_next);
     for(int i = 0;i<4;i++) result[i] = temp[i];
     temp = int32_to_int8(sm->next_meta_addr);
@@ -125,7 +119,7 @@ Status VFS::write_seg_meta(BlockHandle *bh, SegMeta *sm){
         for(int i = 0;i<4;i++) result[findex+i] = temp[i];
         findex+=4;
     }
-    df->write_block(result,0,result.size(),bh);
+    df->write_block(result,BlockHead::FREE_SPACE,bh);
     return s;
 }
 
@@ -201,7 +195,7 @@ Status VFS::free_all_page(BlockHandle *bh){
 }
 
 
-Status VFS::append(uint32_t id, uint32_t &offset, const vector<uint8_t> &data,uint32_t beg,uint32_t len){
+Status VFS::append(uint32_t id, uint32_t &offset, const uint8_t *data,uint32_t len){
     Status s;
     if(M.count(id) == 0) s.FetalError("系统中不存在你要的段，确定id正确？");
     BlockHandle *head_addr = new BlockHandle(M[id]);
@@ -249,7 +243,7 @@ Status VFS::append(uint32_t id, uint32_t &offset, const vector<uint8_t> &data,ui
         delete bh2;
     }
     //到此，p_bh是最终的块，现在写入数据
-    df -> write_block(data,beg,len,p_bh);
+    df -> write_block(data,len,p_bh);
     delete bh;
     delete p_bh;
     delete sm;
@@ -257,7 +251,7 @@ Status VFS::append(uint32_t id, uint32_t &offset, const vector<uint8_t> &data,ui
     return s;
 }
 
-Status VFS::write_page(uint32_t id, uint32_t offset, const vector<uint8_t> &data,uint32_t beg,uint32_t len){
+Status VFS::write_page(uint32_t id, uint32_t offset, const uint8_t *data,uint32_t len){
     Status s;
     if(M.count(id) == 0) s.FetalError("系统中不存在你要的段，确定id正确？");
     BlockHandle head_addr(M[id]);
@@ -292,7 +286,7 @@ Status VFS::write_page(uint32_t id, uint32_t offset, const vector<uint8_t> &data
     //现在已经定位到了最后一个块 sm bh
     if(sm->M[own_offset].first == 0x01){ //表明该页已经在使用
         BlockHandle *bhtmp = new BlockHandle(sm->M[own_offset].second);
-        df->write_block(data,beg,len,bhtmp);//覆盖写入
+        df->write_block(data,len,bhtmp);//覆盖写入
         delete bhtmp;
     }
     else{
@@ -300,7 +294,7 @@ Status VFS::write_page(uint32_t id, uint32_t offset, const vector<uint8_t> &data
         df->alloc_block(&bbtemp);
         sm->M[own_offset] = make_pair(0x01,bbtemp->address);
         write_seg_meta(bh,sm);
-        df->write_block(data,beg,len,bbtemp);
+        df->write_block(data,len,bbtemp);
         delete bbtemp;
     }
     //现在为该页分配新的块，然后写入
@@ -311,7 +305,7 @@ Status VFS::write_page(uint32_t id, uint32_t offset, const vector<uint8_t> &data
     return s;
 }
 
-Status VFS::read_page(uint32_t id, uint32_t offset, vector<uint8_t> &data){
+Status VFS::read_page(uint32_t id, uint32_t offset, uint8_t *data){
     Status s;
     if(M.count(id) == 0) s.FetalError("系统中不存在你要删除的段，确定id正确？");
     BlockHandle head_addr(M[id]);

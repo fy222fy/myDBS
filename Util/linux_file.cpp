@@ -47,6 +47,7 @@ Status LinuxFile::Read(uint64_t offset, size_t n, uint8_t *result){
     if(fd == -1){
         s.FetalError("系统读取错误，文件还未打开");
     }
+    lseek(fd,offset,SEEK_SET);
     int ret = read(fd,result,n);
     if(ret == 0) s.FetalError("系统读取错误，读到文件尾");
     if(ret == -1) s.FetalError("系统读取错误");
@@ -97,7 +98,7 @@ void LinuxFile::Close(){
 }
 
 uint64_t LinuxFile::Size(){
-    return 0;
+    return lseek(fd,0,SEEK_END);
 }
 
 
@@ -105,7 +106,7 @@ uint64_t LinuxFile::Size(){
 
 Status LinuxEnv::NewFile(const std::string &filename, RWFile **f){
     Status s;
-    int fd = open(filename.c_str(),O_CREAT|O_EXCL,S_IRWXU);
+    int fd = open(filename.c_str(),O_CREAT|O_EXCL|O_RDWR,S_IRWXU);
     if(fd == -1) s.FetalError("文件已经存在，请检查使用");
     *f = new LinuxFile(filename.c_str(),fd);
     return s;

@@ -1,13 +1,14 @@
 #include<iostream>
 #include<fstream>
 #include<string>
+#include<cstring>
 #include "include/status.h"
 #include "include/env.h"
 #include "Util/linux_file.h"
 #include "DataFile/Block.h"
 #include "DataFile/DataFile.h"
 #include "VirtualFileSys/VFS.h"
-#include "LOB/LOB.h"
+//#include "LOB/LOB.h"
 #include <ctime>
 using namespace std;
 
@@ -23,8 +24,8 @@ RWFile *new_linuxf(){
 
 int test_env_newandwritefile(){
     RWFile *RR = new_linuxf();
-    vector<uint8_t> v{0x41,0x42,0x43,0x44};
-    Status s = RR->Write(20,v,0,v.size());
+    uint8_t v[4] = {0x41,0x42,0x43,0x44};
+    Status s = RR->Write(20,v,4);
     RR->Flush();
     if(!s.isok()) cout<< "失败" + s.err_msg() <<endl;
     else cout<< "成功" <<endl;
@@ -43,7 +44,7 @@ RWFile *get_linuxf(){
 
 int test_env_readfile(){
     RWFile *RR = get_linuxf();
-    vector<uint8_t> v;
+    uint8_t v[BlockHead::FREE_SPACE];
     Status s = RR->Read(20,3,v);
     if(!s.isok()) cout<< "失败" + s.err_msg() <<endl;
     else cout<< "成功" <<endl;
@@ -79,8 +80,9 @@ int test_alloc_block(){
     DataFile::open_datafile("myFile",op,&df);
     BlockHandle *bb;
     df->alloc_block(&bb);
-    vector<uint8_t> data(BlockHead::FREE_SPACE - 4, 0x56);
-    df->write_block(data,0,data.size(),bb);
+    uint8_t data[BlockHead::FREE_SPACE - 4];
+    memset(data,0x56,BlockHead::FREE_SPACE - 4);
+    df->write_block(data,BlockHead::FREE_SPACE - 4,bb);
     //测试free功能
     //df->free_block(bb);
     //测试read功能
@@ -101,14 +103,14 @@ int test_vfs_append(uint32_t id){
     uint32_t offset;
     uint8_t r = (uint8_t)rand();//随机一个输入数据
     cout << r <<endl;
-    vector<uint8_t> data{r,0x55,0x56,0x57,0x20,0x20,0x21,0x59};
+    uint8_t data[8]={r,0x55,0x56,0x57,0x20,0x20,0x21,0x59};
     VFS *vfs = VFS::get_VFS();
-    vfs->append(id,offset,data,0,data.size());
+    vfs->append(id,offset,data,8);
 }
 
 int test_vfs_read(uint32_t id){
-    uint32_t offset = 14;
-    vector<uint8_t> data;
+    uint32_t offset = 1;
+    uint8_t data[BlockHead::FREE_SPACE] = {0};
     VFS *vfs = VFS::get_VFS();
     vfs->read_page(id,offset,data);
     return 3;
@@ -120,9 +122,9 @@ int test_vfs_free_page(uint32_t id){
 }
 
 int test_vfs_write(uint32_t id){
-    vector<uint8_t> data{0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57};
+    uint8_t data[13] = {0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57,0x57};
     VFS *vfs = VFS::get_VFS();
-    vfs->write_page(id,14,data,0,data.size());
+    vfs->write_page(id,14,data,13);
 }
 
 int test_vfs_free_seg(uint32_t id){
@@ -147,7 +149,7 @@ int test_lob(){
     //LOBimpl *lob = new LOBimpl();
     uint32_t lob_seg_id;
     //lob->create_lobseg(lob_seg_id);//创建一个lob段
-    LOBLocator *ll;
+    //LOBLocator *ll;
     //lob->create_locator(&ll,lob_seg_id);
     vector<uint8_t> data(800,0x64);
     //lob->append(ll,data);
@@ -157,15 +159,7 @@ int test_lob(){
 }
 
 int main(){
-    //test_lob();
-    char *a = (char *)malloc(4 * sizeof(char));
-    a[0] = '1';
-    a[1] = '2';
-    a[2] = '3';
-    a[3] = '4';
-    char *b = a;
-    cout<<b<<endl;
-    free(b);
+    a_single_fun_to_test_VFS();
     exit(1);
 }
 

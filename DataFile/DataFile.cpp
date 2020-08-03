@@ -73,7 +73,7 @@ Status DataFile::read_head(){
 
 Status DataFile::write_head(){
     Status s;
-    uint8_t result[HEAD_SIZE];
+    uint8_t result[HEAD_SIZE] = {0x00};
     s = serialize_head(result);
     s = file->Write(0,result,HEAD_SIZE);
     return s;
@@ -101,7 +101,7 @@ DataFile::~DataFile(){
 
 Status DataFile::read_block_head(BlockHandle *bh, BlockHead **bhead){
     Status s;
-    uint8_t result[BlockHead::HEAD_SIZE];
+    uint8_t result[BlockHead::HEAD_SIZE] = {0x00};
     s = file->Read(bh->address,BlockHead::HEAD_SIZE,result);
     *bhead = new BlockHead(true);
     (*bhead) -> if_free = result[0] == 0x02 ? false:true;
@@ -114,7 +114,7 @@ Status DataFile::read_block_head(BlockHandle *bh, BlockHead **bhead){
 Status DataFile::write_block_head(BlockHandle *bh, BlockHead *bhead){
     Status s;
     //序列化一下bhead
-    uint8_t data[BlockHead::HEAD_SIZE];
+    uint8_t data[BlockHead::HEAD_SIZE] = {0x00};
     data[0] = bhead->if_free == true ? 0x01 : 0x02;
     uint8_t *temp = int32_to_int8(bhead->used_space);
     data[1] = temp[0];
@@ -162,7 +162,7 @@ Status DataFile::alloc_block(BlockHandle **pbh){
     BlockHead bhead(false);
     write_block_head(*pbh,&bhead);
     //然后直接先用0补齐块的内容，后续可能要优化这里
-    uint8_t tempdata[BlockHead::FREE_SPACE, 0x00];
+    uint8_t tempdata[BlockHead::FREE_SPACE] = {0};
     file->Write((*pbh)->address + BlockHead::HEAD_SIZE,tempdata,BlockHead::FREE_SPACE);
     s = file->Flush();
     //最后将这个分配出去的块加在空闲链表中
@@ -183,6 +183,10 @@ Status DataFile::free_block(BlockHandle *bh){
 
 Status DataFile::write_block(const uint8_t *in_data, uint32_t len, BlockHandle *bh){//向表中写入一些数据
     Status s;
+    if(len == 0){
+        s.FetalError("输入数据为空，写入是没有意义的");
+        return s;
+    }
     if(len > BlockHead::FREE_SPACE){
         s.FetalError("输入块的数据太大");
         return s;

@@ -23,11 +23,11 @@ public:
     Status create_seg(uint32_t id);//创建一个段
     Status free_seg(uint32_t id);//删除一个段
     //追加指定长度的数据
-    Status append(uint32_t id, uint32_t &offset, const vector<uint8_t> &data,uint32_t beg,uint32_t len);
+    Status append(uint32_t id, uint32_t &offset, const uint8_t *data,uint32_t len);
     //在指定虚拟偏移写入指定数据
-    Status write_page(uint32_t id, uint32_t offset, const vector<uint8_t> &data,uint32_t beg,uint32_t len);
+    Status write_page(uint32_t id, uint32_t offset, const uint8_t *data,uint32_t len);
     //读取指定偏移的数据页
-    Status read_page(uint32_t id, uint32_t offset, vector<uint8_t> &data);
+    Status read_page(uint32_t id, uint32_t offset, uint8_t *data);
     //释放指定偏移的数据页
     Status free_page(uint32_t id, uint32_t offset);
     //获取一个没用过的段ID
