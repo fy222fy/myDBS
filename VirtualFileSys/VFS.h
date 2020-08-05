@@ -40,11 +40,11 @@ private:
     VFS(Options *op);//没用的构造函数
     Status read_seg_info();//从文件头部读所有的段信息
     Status write_add_seg_info();//将段的头部信息全部写到数据文件头部
-    Status read_seg_head(BlockHandle *bh, SegHead **sh);//从bh中读出段头
-    Status write_seg_head(BlockHandle *bh, SegHead *sh);//将段头写入bh中
-    Status read_seg_meta(BlockHandle *bh, SegMeta **sm);//从bh中读取段meta
-    Status write_seg_meta(BlockHandle *bh, SegMeta *sm);//在bh中写段meta
-    Status free_all_page(BlockHandle *bh);//一个递归函数，为free_seg使用来释放所有的段用的
+    Status read_seg_head(BlockHandle bh, SegHead &sh);//从bh中读出段头
+    Status write_seg_head(BlockHandle bh, SegHead sh);//将段头写入bh中
+    Status read_seg_meta(BlockHandle bh, SegMeta &sm);//从bh中读取段meta
+    Status write_seg_meta(BlockHandle bh, SegMeta sm);//在bh中写段meta
+    Status free_all_page(BlockHandle bh);//一个递归函数，为free_seg使用来释放所有的段用的
     map<uint32_t, uint64_t> M;//保存所有段的id和对应的段头物理地址
     uint32_t nums;//目前段的数量
     bool is_active;//判断这个虚拟文件是否启用
@@ -64,6 +64,18 @@ public:
         :ID(id), meta_first_addr(addr){}
     //空创建，必须调用read读入
     SegHead():ID(0), meta_first_addr(0){}
+    void Serialize(uint8_t *result){
+        Convert convert;
+        uint8_t *temp = convert.int32_to_int8(ID);//首先写入ID
+        for(int i = 0; i < 4; i++) result[i] = temp[i];
+        temp = convert.int64_to_int8(meta_first_addr);
+        for(int i = 0; i < 8; i++) result[4 + i] = temp[i];
+    }
+    void Deserialize(const uint8_t *input){
+        Convert convert;
+        ID = convert.int8_to_int32(input,0);//反序列ID
+        meta_first_addr = convert.int8_to_int64(input,4);//反序列首元数据地址
+    }
 };
 
 /**
@@ -83,6 +95,36 @@ struct SegMeta{
     }
     ~SegMeta(){
         vector<pair<uint64_t, uint64_t>>().swap(M);//清空vector
+    }
+    void Serialize(uint8_t *result){
+        Convert convert;
+        uint8_t *temp = convert.int32_to_int8(if_have_next);
+        for(int i = 0;i<4;i++) result[i] = temp[i];
+        temp = convert.int64_to_int8(next_meta_addr);
+        for(int i = 0;i<8;i++) result[4+i] = temp[i];
+        int findex = 12;
+        for(auto item:M){
+            uint32_t state = item.first;
+            temp = convert.int32_to_int8(state);
+            for(int i = 0;i<4;i++) result[findex+i] = temp[i];
+            findex+=4;
+            temp = convert.int64_to_int8(item.second);
+            for(int i = 0;i<8;i++) result[findex+i] = temp[i];
+            findex+=8;
+        }
+    }
+    void Deserialize(const uint8_t *input){
+        Convert convert;
+        if_have_next = convert.int8_to_int32(input,0);
+        next_meta_addr = convert.int8_to_int64(input,4);
+        int j = 12;
+        for(int i = 0; i < VFS::META_NUMS; i++){
+            uint32_t state = convert.int8_to_int32(input,j);
+            j+=4;
+            uint64_t p_addr = convert.int8_to_int64(input, j);
+            j+=8;
+            M[i] = make_pair(state,p_addr); //添加到map中
+        }
     }
 };
 

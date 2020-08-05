@@ -3,39 +3,40 @@
 #include <assert.h>
 
 
-DataFile::DataFile(RWFile *f, string fname)
-    :file(f),
-    filename(fname),
-    ID(4294967295),//#fffffff
-    type(0x24){
+Status DataFile::init(RWFile *f, string fname){
+    Status s;
+    if(f == nullptr) s.FetalError("RWFILE指针为空！");
+    file = f;
+    filename = fname;
+    return s;
 }
 
-Status DataFile::create_datafile(string fname, Options *options, DataFile **df){
+Status DataFile::create_datafile(string fname, Options *options, DataFile *df){
     Status s;
     //创建文件
     RWFile *f;
     s = options->env->NewFile(fname,&f);//创建新文件
     //初始化一个数据文件对象
-    *df = new DataFile(f,fname);
+    df->init(f,fname);
     //TODO，应该有一些初始值需要写在头部，目前都是默认值
-    (*df) -> write_head();
-    (*df) -> init_map();
-    BlockHandle *bh;
-    (*df) -> alloc_block(&bh);//分配1个块出来，为段使用
+    df -> write_head();
+    df -> init_map();
+    BlockHandle bh;
+    df -> alloc_block(bh);//分配1个块出来，为段使用
     return s;
 }
 
-Status DataFile::open_datafile(string fname, Options *options, DataFile **df){
+Status DataFile::open_datafile(string fname, Options *options, DataFile *df){
     Status s;
     //打开文件
     RWFile *f;
     options->env->OpenFile(fname,&f);
     //初始化一个数据文件对象
-    *df = new DataFile(f,fname);
+    df->init(f,fname);
     //从文件中读取数据文件头信息
-    (*df) -> read_head();
+    df -> read_head();
     //初始化空闲表
-    (*df) -> init_map();
+    df -> init_map();
     return s;
 }
 
@@ -45,7 +46,8 @@ bool DataFile::if_exist(string fname, Options *op){
 
 Status DataFile::serialize_head(uint8_t *result){
     Status s;
-    uint8_t *temp = int32_to_int8(ID);
+    Convert convert;
+    uint8_t *temp = convert.int32_to_int8(ID);
     result[0] = temp[0];
     result[1] = temp[1];
     result[2] = temp[2];
@@ -56,7 +58,8 @@ Status DataFile::serialize_head(uint8_t *result){
 
 Status DataFile::deserialize_head(const uint8_t *input){
     Status s;
-    ID = int8_to_int32(input,0);
+    Convert convert;
+    ID = convert.int8_to_int32(input,0);
     type = input[4];
     return s;
 }
@@ -84,10 +87,9 @@ Status DataFile::init_map(){
     free_map = new map<uint64_t,bool>;//声明位图
     for(uint32_t i = HEAD_SIZE; i < file->Size(); i += BlockHead::MAX_SIZE){
         BlockHandle bh(i);
-        BlockHead *bhead;
-        read_block_head(&bh, &bhead);
-        (*free_map)[i] = bhead->if_free;
-        delete bhead;
+        BlockHead bhead;
+        read_block_head(bh, bhead);
+        (*free_map)[i] = bhead.if_free;
     }
     return s;
 }
@@ -99,45 +101,28 @@ DataFile::~DataFile(){
     delete file;
 }
 
-Status DataFile::read_block_head(BlockHandle *bh, BlockHead **bhead){
+Status DataFile::read_block_head(BlockHandle bh, BlockHead &bhead){
     Status s;
+    Convert convert;
     uint8_t result[BlockHead::HEAD_SIZE] = {0x00};
-    s = file->Read(bh->address,BlockHead::HEAD_SIZE,result);
-    *bhead = new BlockHead(true);
-    (*bhead) -> if_free = result[0] == 0x02 ? false:true;
-    (*bhead) -> used_space = int8_to_int32(result, 1);
-    (*bhead) -> block_size = int8_to_int32(result, 5);
-    (*bhead) -> in_offset = int8_to_int32(result,9);
+    s = file->Read(bh.address,BlockHead::HEAD_SIZE,result);
+    s = bhead.Deserialize(result);
     return s;
 }
 
-Status DataFile::write_block_head(BlockHandle *bh, BlockHead *bhead){
+Status DataFile::write_block_head(BlockHandle bh, BlockHead &bhead){
     Status s;
+    Convert convert;
     //序列化一下bhead
     uint8_t data[BlockHead::HEAD_SIZE] = {0x00};
-    data[0] = bhead->if_free == true ? 0x01 : 0x02;
-    uint8_t *temp = int32_to_int8(bhead->used_space);
-    data[1] = temp[0];
-    data[2] = temp[1];
-    data[3] = temp[2];
-    data[4] = temp[3];
-    temp = int32_to_int8(bhead->block_size);
-    data[5] = temp[0];
-    data[6] = temp[1];
-    data[7] = temp[2];
-    data[8] = temp[3];
-    temp = int32_to_int8(bhead->in_offset);
-    data[9] = temp[0];
-    data[10] = temp[1];
-    data[11] = temp[2];
-    data[12] = temp[3];
+    bhead.Serialize(data);
     //然后把数据写进去
-    s = file->Write(bh->address,data,BlockHead::HEAD_SIZE);
+    s = file->Write(bh.address,data,BlockHead::HEAD_SIZE);
     s = file->Flush();
     return s;
 }
 
-Status DataFile::alloc_block(BlockHandle **pbh){
+Status DataFile::alloc_block(BlockHandle &pbh){
     Status s;
     uint32_t addr;//要找到的一个块的地址
     //检查空闲链表获得空闲地址
@@ -157,31 +142,31 @@ Status DataFile::alloc_block(BlockHandle **pbh){
         } 
         addr = file->Size();//分配最后的地址，也就是新开辟一个空间
     }
-    *pbh = new BlockHandle(addr);//构建块handle
+    pbh.address = addr;//构建块handle
     //下面写入块头结构
-    BlockHead bhead(false);
-    write_block_head(*pbh,&bhead);
+    BlockHead bhead;
+    write_block_head(pbh,bhead);
     //然后直接先用0补齐块的内容，后续可能要优化这里
     uint8_t tempdata[BlockHead::FREE_SPACE] = {0};
-    file->Write((*pbh)->address + BlockHead::HEAD_SIZE,tempdata,BlockHead::FREE_SPACE);
+    file->Write(pbh.address + BlockHead::HEAD_SIZE,tempdata,BlockHead::FREE_SPACE);
     s = file->Flush();
     //最后将这个分配出去的块加在空闲链表中
     (*free_map)[addr] = false;
     return s;
 }
 
-Status DataFile::free_block(BlockHandle *bh){
+Status DataFile::free_block(BlockHandle bh){
     //TODO:先写入log文件持久化
     //然后更改空闲表和数据块头
     Status s;
-    (*free_map)[bh->address] = true;//更改空闲表
-    BlockHead bhead(true);
-    write_block_head(bh, &bhead);
-    delete bh;
+    (*free_map)[bh.address] = true;//更改空闲表
+    BlockHead bhead;
+    bhead.set_free();
+    write_block_head(bh, bhead);
     return s;
 }
 
-Status DataFile::write_block(const uint8_t *in_data, uint64_t len, BlockHandle *bh){//向表中写入一些数据
+Status DataFile::write_block(const uint8_t *in_data, uint64_t len, BlockHandle bh){//向表中写入一些数据
     Status s;
     if(len == 0){
         s.FetalError("输入数据为空，写入是没有意义的");
@@ -191,11 +176,11 @@ Status DataFile::write_block(const uint8_t *in_data, uint64_t len, BlockHandle *
         s.FetalError("输入块的数据太大");
         return s;
     }    
-    BlockHead bhead(false);
+    BlockHead bhead;
     bhead.used_space = len;
-    s = write_block_head(bh,&bhead);
+    s = write_block_head(bh,bhead);
     if(!s.isok()) s.FetalError("数据块头写入文件失败");
-    s = file->Write(bh->address + BlockHead::HEAD_SIZE, in_data,len);
+    s = file->Write(bh.address + BlockHead::HEAD_SIZE, in_data,len);
     s = file->Flush();
     if(!s.isok()) s.FetalError("数据块写入文件失败");
     return s;
@@ -208,18 +193,17 @@ Status DataFile::flush(){
     return s;
 }
 
-Status DataFile::read_block(BlockHandle *bh, uint8_t *result){
+Status DataFile::read_block(BlockHandle bh, uint8_t *result){
     Status s;
     //首先读取头部信息，看看块到底是不是真的在用，以及数据部分的长度是多少
-    BlockHead *bhead;
-    s = read_block_head(bh, &bhead);
-    if(bhead->if_free) s.FetalError("块没有分配缺在进行读操作");
+    BlockHead bhead;
+    s = read_block_head(bh, bhead);
+    if(bhead.if_free) s.FetalError("块没有分配缺在进行读操作");
     //读取指定长度的数据出来
-    s = file->Read(bh->address + BlockHead::HEAD_SIZE,bhead->used_space,result);
+    s = file->Read(bh.address + BlockHead::HEAD_SIZE,bhead.used_space,result);
     if(!s.isok()){
         s.FetalError("读取块失败");
     }
-    delete bhead;
     return s;
 }
 
@@ -228,14 +212,14 @@ void DataFile::Close(){
     file->Close();
 }
 
-Status DataFile::get_first_bh(BlockHandle **bh){
+Status DataFile::get_first_bh(BlockHandle &bh){
     Status s;
-    *bh = new BlockHandle(DataFile::HEAD_SIZE);
+    bh.address = DataFile::HEAD_SIZE;
     return s;
 }
 
-Status DataFile::get_next_bh(BlockHandle **bh){
+Status DataFile::get_next_bh(BlockHandle &bh){
     Status s;
-    (*bh)->address += BlockHead::MAX_SIZE;
+    bh.address += BlockHead::MAX_SIZE;
     return s;
 }

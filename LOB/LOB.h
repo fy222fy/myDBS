@@ -1,11 +1,12 @@
 #ifndef OB_LOB_INTERFACE
 #define OB_LOB_INTERFACE
 #include<string>
+#include<cstring>
 #include<vector>
 #include "../include/status.h"
 #include "LOB_locator.h"
 #include "../Util/Util.h"
-struct LOBH;
+
 struct LHP;
 struct LHIP;
 
@@ -16,24 +17,39 @@ struct LHIP;
  * checksum：校验和
  * type：这个页的作用，主要是确定一阶索引还是二阶索引
 */
-struct LOBH
+struct LOBP
 {
-    LOBH(uint32_t s,uint32_t cks):size(s),checksum(cks),type(0x00){}
-    LOBH():size(0),checksum(0),type(0x00){}
-    ~LOBH(){}
-    uint32_t size;
+    LOBP(const uint8_t *dta, uint64_t l):data(dta),data_size(l),checksum(1280262656),type(0x00){}
+    LOBP():data_size(0),checksum(0),type(0x00){}
+    
+    ~LOBP(){}
+    uint64_t data_size;
     uint32_t checksum;
     uint8_t type;
-    static const uint32_t HEAD_SIZE = 8;//LOB页头结构的大小
-    void Serialize(vector<uint8_t> &output){
-        uint8_t *temp = int32_to_int8(size);
-        for(int i = 0; i < 4;i++) output.emplace_back(temp[i]);
-        temp = int32_to_int8(checksum);
-        for(int i = 0; i < 4;i++) output.emplace_back(temp[i]);
+    const uint8_t *data;
+    static const uint32_t HEAD_SIZE = 12;//LOB页头结构的大小
+    void Serialize(uint8_t *output){
+        Convert convert;
+        uint32_t it = 0;
+        uint8_t *temp = convert.int64_to_int8(data_size);
+        for(int i = 0; i < 8;i++) output[it++] = temp[i];
+        temp = convert.int32_to_int8(checksum);
+        for(int i = 0; i < 4;i++) output[it++] = temp[i];
+        memcpy(output + HEAD_SIZE,data,data_size);
     }
-    void Deserialize(vector<uint32_t> &input){
-
+    void Deserialize(const uint8_t *input){
+        Convert convert;
+        uint32_t it = 0 ;
+        data_size = convert.int8_to_int64(input,it);
+        it+=8;
+        checksum = convert.int8_to_int32(input,it);
+        it+=4;
+        uint8_t *tmp = new uint8_t[data_size];
+        memcpy(tmp,input+HEAD_SIZE,data_size);
+        data = tmp;
     }
+private:
+    LOBP(const uint8_t *dta):data(dta){}
 };
 /**
  * LOB Header Page的结构
@@ -43,39 +59,57 @@ struct LOBH
 */
 struct LHP
 {
-    LHP():nums(0),checksum(1279807488),type(0x01){}
-    ~LHP(){vector<uint32_t>().swap(M);}
-    uint32_t nums;
+    LHP():data_size(0),nums(0),checksum(1279807488),type(0x01){}
+    ~LHP(){vector<pair<uint64_t,uint64_t>>().swap(M);}
+    uint32_t nums;//LHP中lpa的个数
     uint32_t checksum;
     uint8_t type;//本LHP是用来做什么的
-    vector<uint32_t> M;
+    uint64_t data_size;
+    vector<pair<uint64_t,uint64_t>> M;
     static const uint32_t HEAD_SIZE = 8;
-    static const uint32_t MAX_LPA = (VFS::PAGE_FREE_SPACE - HEAD_SIZE) / 4;
-    void append(uint32_t lpa){
-        M.emplace_back(lpa);
+    static const uint64_t LHP_SIZE = VFS::PAGE_FREE_SPACE;
+    static const uint32_t MAX_LPA = (VFS::PAGE_FREE_SPACE - HEAD_SIZE) / 16;
+    void append(uint64_t lpa,uint64_t size){
+        M.emplace_back(make_pair(lpa,size));
+        data_size += size;
         nums++;
     }//加入一个lpa
+    
     void Serialize(uint8_t *result){
-        uint8_t *temp = int32_to_int8(nums);
+        Convert convert;
+        uint8_t *temp = convert.int32_to_int8(nums);
         int it = 0;
         for(int i = 0; i < 4;i++) result[it++] = temp[i];
-        temp = int32_to_int8(checksum);
+        temp = convert.int32_to_int8(checksum);
         for(int i = 0; i < 4;i++) result[it++] = temp[i];
+        temp = convert.int64_to_int8(data_size);
+        for(int i = 0; i < 8;i++) result[it++] = temp[i];
         for(int j = 0; j < nums; j++){
-            temp = int32_to_int8(M[j]);
-            for(int i = 0; i < 4;i++) result[it++] = temp[i];
+            temp = convert.int64_to_int8(M[j].first); //序列化lpa
+            for(int i = 0; i < 8;i++) result[it++] = temp[i];
+            temp = convert.int64_to_int8(M[j].second);//序列化每个lpa对应的size
+            for(int i = 0; i < 8;i++) result[it++] = temp[i];
         }
     }
     void Deserialize(const uint8_t *input){
+        Convert convert;
         int it = 0;
-        nums = int8_to_int32(input,it);
+        nums = convert.int8_to_int32(input,it);
         it+=4;
-        checksum = int8_to_int32(input,it);
+        checksum = convert.int8_to_int32(input,it);
         it+=4;
-        for(int i = 0;i < nums;i++,it=it+4){
-            M.emplace_back(int8_to_int32(input,it));
+        data_size = convert.int8_to_int64(input,it);
+        it+=8;
+        for(int i = 0;i < nums;i++){
+            uint64_t addr = convert.int8_to_int64(input,it);
+            it+=8;
+            uint64_t size = convert.int8_to_int64(input,it);
+            it+=8;
+            M.emplace_back(make_pair(addr,size));
         }
     }
+    bool is_full()const{return nums >= MAX_LPA;}
+    uint64_t get_data_size()const{return data_size;}
 };
 
 /**
@@ -87,38 +121,48 @@ struct LHP
 struct LHIP
 {
     LHIP():nums(0),checksum(1279805776),type(0x02){}
-    ~LHIP(){vector<uint32_t>().swap(M);}
+    ~LHIP(){vector<pair<uint64_t,uint64_t>>().swap(M);}
     uint32_t nums;
     uint32_t checksum;
+    uint64_t data_size;
     uint8_t type;//类型
-    vector<uint32_t> M;
+    vector<pair<uint64_t,uint64_t>> M;
     static const uint32_t HEAD_SIZE = 8;
-    void append(uint32_t lhpa){
-        M.emplace_back(lhpa);
+    static const uint64_t LHIP_SIZE = VFS::PAGE_FREE_SPACE;
+    void append(uint64_t lhpa, uint64_t size){
+        M.emplace_back(make_pair(lhpa,size));
         nums++;
+        data_size += size;
     }//加入一个lpa
-    uint32_t read_last_lhpa(){
-        return *(M.end() - 1);
-    }
+    uint64_t read_last_lhpa(){ return M[nums-1].first;}
+    void remove_last_lhpa(){M.pop_back();nums-=1;}
     void Serialize(uint8_t *result){
-        uint8_t *temp = int32_to_int8(nums);
+        Convert convert;
+        uint8_t *temp = convert.int32_to_int8(nums);
         int it = 0;
         for(int i = 0; i < 4;i++) result[it++] = temp[i];
-        temp = int32_to_int8(checksum);
+        temp = convert.int32_to_int8(checksum);
         for(int i = 0; i < 4;i++) result[it++] = temp[i];
         for(int j = 0; j < nums; j++){
-            temp = int32_to_int8(M[j]);
-            for(int i = 0; i < 4;i++) result[it++] = temp[i];
+            temp = convert.int64_to_int8(M[j].first); //序列化lhpa
+            for(int i = 0; i < 8;i++) result[it++] = temp[i];
+            temp = convert.int64_to_int8(M[j].second);//序列化每个lhpa对应的size
+            for(int i = 0; i < 8;i++) result[it++] = temp[i];
         }
     }
     void Deserialize(const uint8_t *input){
+        Convert convert;
         int it = 0;
-        nums = int8_to_int32(input,it);
+        nums = convert.int8_to_int32(input,it);
         it+=4;
-        checksum = int8_to_int32(input,it);
+        checksum = convert.int8_to_int32(input,it);
         it+=4;
-        for(int i = 0;i < nums;i++,it=it+4){
-            M.emplace_back(int8_to_int32(input,it));
+        for(int i = 0;i < nums; i++){
+            uint64_t addr = convert.int8_to_int64(input,it);
+            it+=8;
+            uint64_t size = convert.int8_to_int64(input,it);
+            it+=8;
+            M.emplace_back(make_pair(addr,size));
         }
     }
 };
@@ -128,18 +172,18 @@ struct LHIP
 class LOBimpl{
 public:
     LOBimpl();
-    Status create_locator(LOBLocator **llp, uint32_t seg_id);//创建一个空的lob，获取locator
+    Status create_locator(LOBLocator *llp, uint32_t seg_id);//创建一个空的lob，获取locator
     Status create_lobseg(uint32_t &seg_id);//创建一个lob段，获取段的id
     Status append(LOBLocator *ll, const uint8_t *data, uint64_t len);//追加数据，并修改locator结构
     Status write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, uint64_t len);//覆写数据
     Status read(LOBLocator *ll, uint64_t amount, uint64_t data_off, uint8_t *result);//读取数据
     Status erase(LOBLocator *ll, uint64_t amount, uint64_t data_off);//删除部分数据
     Status drop(LOBLocator *ll);//删除指向的所有lob数据
-    static const uint64_t LOB_PAGE_SIZE = VFS::PAGE_FREE_SPACE - LOBH::HEAD_SIZE;
-    static const uint64_t LHP_SIZE = VFS::PAGE_FREE_SPACE - LOBH::HEAD_SIZE;
-    static const uint64_t LHP_NUMS = LHP_SIZE / 4;
-    static const uint64_t LHPI_SIZE = VFS::PAGE_FREE_SPACE - LOBH::HEAD_SIZE;
-    static const uint64_t LHPI_NUMS = LHPI_SIZE / 4;
+    static const uint64_t LOB_PAGE_SIZE = VFS::PAGE_FREE_SPACE - LOBP::HEAD_SIZE;
+    static const uint64_t LHP_SIZE = VFS::PAGE_FREE_SPACE - LOBP::HEAD_SIZE;
+    static const uint64_t LHP_NUMS = LHP_SIZE / 16;
+    static const uint64_t LHPI_SIZE = VFS::PAGE_FREE_SPACE - LOBP::HEAD_SIZE;
+    static const uint64_t LHPI_NUMS = LHPI_SIZE / 16;
     static const uint64_t OUTLINE_1_MAX_SIZE = LOBLocator::MAX_LPA * LOB_PAGE_SIZE;//行外存1模式最大数据量
     static const uint64_t OUTLINE_2_MAX_SIZE = LHP_NUMS * LOB_PAGE_SIZE;
     static const uint64_t OUTLINE_3_MAX_SIZE = LHPI_NUMS * LHP_NUMS * LOB_PAGE_SIZE;
@@ -150,17 +194,17 @@ private:
     Status create_lobpage(uint32_t segid, uint64_t &offset, const uint8_t *data, uint64_t len);
     //Status append_lobpage(uint32_t &offset, LOBP *lobp);
     Status write_lobpage(uint32_t segid, uint64_t offset, const uint8_t *data, uint64_t len);
-    Status read_lobpage(uint32_t segid, uint64_t offset, uint8_t *output);
+    Status read_lobpage(uint32_t segid, uint64_t offset, uint8_t *output, uint64_t len);
     Status free_lobpage(uint32_t offset);
-    Status create_LHP(LHP **lhp);
-    //Status append_LHP(uint32_t &offset, LHP *lhp);
-    Status write_LHP(uint32_t segid, uint64_t &offset, LHP *lhp);
-    Status read_LHP(uint32_t segid, uint64_t offset, LHP **lhp);
+    //Status create_LHP(LHP **lhp);
+    Status append_LHP(uint32_t segid, uint64_t &offset, LHP lhp);
+    Status write_LHP(uint32_t segid, uint64_t offset, LHP lhp);
+    Status read_LHP(uint32_t segid, uint64_t offset, LHP &lhp);
     Status free_LHP();
-    Status create_LHIP(LHIP **lhip);
-    //Status append_LHIP(uint32_t &offset, LHIP *lhip);
-    Status write_LHIP(uint32_t segid, uint64_t &offset, LHIP *lhip);
-    Status read_LHIP(uint32_t segid, uint64_t offset, LHIP **lhip);
+    //Status create_LHIP(LHIP **lhip);
+    Status append_LHIP(uint32_t segid, uint64_t &offset, LHIP lhip);
+    Status write_LHIP(uint32_t segid, uint64_t offset, LHIP lhip);
+    Status read_LHIP(uint32_t segid, uint64_t offset, LHIP &lhip);
     Status free_LHIP();
     uint32_t new_lob_id();
     //在out-1结构中插入数据，如果能全部插入就全部插入，否则插满返回即可
@@ -220,7 +264,7 @@ public:
     Status FRAGMENT_REPLACE(LOBLocator *lob_loc, uint64_t old_amount, uint64_t new_amount, uint64_t offset, const uint8_t *data);
     /// 获取LOB数据的长度
     /// \param lob_loc LOB的指示器
-    uint32_t GETLENGTH(LOBLocator *lob_loc){return lob_loc->data_size;}
+    uint32_t GETLENGTH(LOBLocator *lob_loc){return lob_loc->get_data_size();}
     /// 从LOB指定的偏移处读取指定数量的数据
     /// \param lob_loc LOB的指示器
     /// \param amount 要读取的数据的长度

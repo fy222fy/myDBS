@@ -1,5 +1,4 @@
-obj = main.o Util/linux_file.o Util/Util.o DataFile/DataFile.o VirtualFileSys/VFS.o 
-#LOB/LOB.o
+obj = main.o Util/linux_file.o Util/Util.o DataFile/DataFile.o VirtualFileSys/VFS.o LOB/LOBimpl.o
 run : $(obj)
 	g++ -g -o run $(obj) -std=c++11
 main.o : main.cpp
@@ -12,15 +11,15 @@ DataFile/DataFile.o : DataFile/DataFile.cpp
 	g++ -g -c DataFile/DataFile.cpp -o DataFile/DataFile.o -std=c++11
 VirtualFileSys/VFS.o : VirtualFileSys/VFS.cpp
 	g++ -g -c VirtualFileSys/VFS.cpp -o VirtualFileSys/VFS.o -std=c++11
-#LOB/LOB.o : LOB/LOB.cpp
-	#g++ -g -c LOB/LOB.cpp -o LOB/LOB.o -std=c++11
+LOB/LOBimpl.o : LOB/LOBimpl.cpp
+	g++ -g -c LOB/LOBimpl.cpp -o LOB/LOBimpl.o -std=c++11
 
 
 clean :
-	rm run
-	rm myFile
 	rm *.o
 	rm Util/*.o
 	rm DataFile/*.o
 	rm VirtualFileSys/*.o
 	rm LOB/*.o
+	rm run
+	rm myFile

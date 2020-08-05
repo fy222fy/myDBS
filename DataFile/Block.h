@@ -9,6 +9,7 @@
 #include<iostream>
 #include<fstream>
 #include "../include/env.h"
+#include "../Util/Util.h"
 
 /**
  * 宏块块头的结构，该结构与磁盘上的宏块结构对应。
@@ -30,15 +31,44 @@ struct BlockHead{
     const static uint32_t MAX_SIZE = 160;
     const static uint32_t HEAD_SIZE = 16;
     const static uint32_t FREE_SPACE = MAX_SIZE - HEAD_SIZE;
-
+    Status Deserialize(const uint8_t *result){
+        Status s;
+        Convert convert;
+        if_free = result[0] == 0x02 ? false:true;
+        used_space = convert.int8_to_int32(result, 1);
+        block_size = convert.int8_to_int32(result, 5);
+        in_offset = convert.int8_to_int32(result,9);
+        return s;
+    }
+    Status Serialize(uint8_t *data){
+        Status s;
+        Convert convert;
+        data[0] = if_free == true ? 0x01 : 0x02;
+        uint8_t *temp = convert.int32_to_int8(used_space);
+        data[1] = temp[0];
+        data[2] = temp[1];
+        data[3] = temp[2];
+        data[4] = temp[3];
+        temp = convert.int32_to_int8(block_size);
+        data[5] = temp[0];
+        data[6] = temp[1];
+        data[7] = temp[2];
+        data[8] = temp[3];
+        temp = convert.int32_to_int8(in_offset);
+        data[9] = temp[0];
+        data[10] = temp[1];
+        data[11] = temp[2];
+        data[12] = temp[3];
+        return s;
+    }
     //构造函数创建一个还没有使用过的空块，参数是这个块是否使用过
-    BlockHead(bool if_f)
-        :if_free(if_f),
+    BlockHead()
+        :if_free(false),
         used_space(0),
         block_size(MAX_SIZE),
         in_offset(HEAD_SIZE){}
-    BlockHead() = delete;
     ~BlockHead(){}
+    void set_free(){if_free = true;}
 };
 /**
  * 宏块的句柄，包含宏块的物理地址，用来对一个块进行操作
@@ -49,6 +79,7 @@ public:
      * 用一个已有的地址来初始化这个handle
     */
     BlockHandle(uint64_t addr):address(addr){}
+    BlockHandle():address(0){}
     ~BlockHandle(){}
     uint64_t address; //物理地址
 };

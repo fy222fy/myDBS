@@ -21,18 +21,19 @@ using namespace std;
 */
 struct DataFile{ //数据文件的结构
 public:
+    DataFile():file(nullptr),filename("NULL"),ID(4294967295),type(0x24){}
     const static uint32_t HEAD_SIZE = 16; //设置头部的初始大小
-    const static uint64_t DF_MAX_SIZE = 1000000;//设置数据文件最大长度
+    const static uint64_t DF_MAX_SIZE = 562949953421312;//设置数据文件最大长度
     /**
      * 如果当前还不存在数据文件，调用该函数
      * 以给定文件名创建一个数据文件，并返回该数据文件指针
     */
-    static Status open_datafile(std::string fname, Options *options, DataFile **df);
+    static Status open_datafile(std::string fname, Options *options, DataFile *df);
     /**
      * 如果当前还不存在数据文件，调用该函数
      * 以给定文件名创建一个数据文件，并返回该数据文件指针
     */
-    static Status create_datafile(std::string fname, Options *options, DataFile **df);
+    static Status create_datafile(std::string fname, Options *options, DataFile *df);
     /**
      * 判断一个数据文件是不是已经存在
     */
@@ -46,19 +47,19 @@ public:
      * 申请一个块句柄给用户，句柄中的核心数据是物理地址
      * 此时还没有写文件，只是把文件的这一块给预留出来了
     */
-    Status alloc_block(BlockHandle **bb);
+    Status alloc_block(BlockHandle &bb);
     /**
      * 将块内容给free掉，只是修改文件中对应块头的状态位
      * 还有修改内存中的空闲链表
      * 这里为了保证持久化，可能需要增加log文件以记录修改过程
     */
-    Status free_block(BlockHandle *bb);
+    Status free_block(BlockHandle bb);
     /**
      * 向已经分配的块中写入一段数据
      * 这里不做缓存，直接写入文件的对应位置
      * 除了上层用户写入的数据以外，还要把块头信息一起写入
     */
-    Status write_block(const uint8_t* data, uint64_t len, BlockHandle *bb);
+    Status write_block(const uint8_t* data, uint64_t len, BlockHandle bb);
     /**
      * 将缓冲区内的所有数据刷到磁盘上
      * 即调用文件接口的函数写文件
@@ -68,11 +69,11 @@ public:
      * 根据给定的物理地址，读取一个块到内存中并返回
      * 注意这里是从文件中读取的
     */
-    Status read_block(BlockHandle *bh, uint8_t *result);
+    Status read_block(BlockHandle bh, uint8_t *result);
     //为第一次打开文件的用户提供一个首要数据的偏移
-    Status get_first_bh(BlockHandle **bh);
+    Status get_first_bh(BlockHandle &bh);
     //获得当前地址的下一个地址，这两个函数今后不一定使用
-    Status get_next_bh(BlockHandle **bh);
+    Status get_next_bh(BlockHandle &bh);
     //关闭文件
     void Close();
 private:
@@ -82,7 +83,7 @@ private:
     uint8_t type;//数据文件类型，目前只考虑普通用户数据文件
     map<uint64_t,bool> *free_map; //块空闲位图，块地址-是否空闲，这是从文件中读出来的    
     //以文件指针和文件名来构造数据文件对象
-    DataFile(RWFile *f, string fname);
+    Status init(RWFile *f, string fname);
     //初始化空闲位图
     Status init_map();
     //将头部信息序列化
@@ -94,9 +95,9 @@ private:
     //将头部数据写入头部
     Status write_head();
     //从指定地址中读取块的头部信息
-    Status read_block_head(BlockHandle *bh, BlockHead **bhead);
+    Status read_block_head(BlockHandle bh, BlockHead &bhead);
     //将块头部信息写入指定地址
-    Status write_block_head(BlockHandle *bh, BlockHead *bhead);
+    Status write_block_head(BlockHandle bh, BlockHead &bhead);
 };//
 
 

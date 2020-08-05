@@ -8,7 +8,7 @@
 #include "DataFile/Block.h"
 #include "DataFile/DataFile.h"
 #include "VirtualFileSys/VFS.h"
-//#include "LOB/LOB.h"
+#include "LOB/LOB.h"
 #include <ctime>
 using namespace std;
 
@@ -58,8 +58,8 @@ int test_env_readfile(){
 int create_adatafile(){
     Env *env = new LinuxEnv();
     Options *op = new Options(env);
-    DataFile *df;
-    DataFile::create_datafile("myFile",op,&df);
+    DataFile *df = new DataFile();
+    DataFile::create_datafile("myFile",op,df);
     delete df;
     delete op;
 }
@@ -67,8 +67,8 @@ int create_adatafile(){
 int open_adatafile(){
     Env *env = new LinuxEnv();
     Options *op = new Options(env);
-    DataFile *df;
-    DataFile::open_datafile("myFile",op,&df);
+    DataFile *df = new DataFile();
+    DataFile::open_datafile("myFile",op,df);
     delete df;
     delete op;
 }
@@ -76,10 +76,10 @@ int open_adatafile(){
 int test_alloc_block(){
     Env *env = new LinuxEnv();
     Options *op = new Options(env);
-    DataFile *df;
-    DataFile::open_datafile("myFile",op,&df);
-    BlockHandle *bb;
-    df->alloc_block(&bb);
+    DataFile *df = new DataFile();
+    DataFile::open_datafile("myFile",op,df);
+    BlockHandle bb;
+    df->alloc_block(bb);
     uint8_t data[BlockHead::FREE_SPACE - 4];
     memset(data,0x56,BlockHead::FREE_SPACE - 4);
     df->write_block(data,BlockHead::FREE_SPACE - 4,bb);
@@ -151,20 +151,28 @@ int test_lob(){
     Env *env = new LinuxEnv();
     Options *op = new Options(env);
     VFS *vfs = VFS::get_VFS(op);
-    //LOBimpl *lob = new LOBimpl();
+    LOBimpl *lob = new LOBimpl();
     uint32_t lob_seg_id;
-    //lob->create_lobseg(lob_seg_id);//创建一个lob段
-    //LOBLocator *ll;
-    //lob->create_locator(&ll,lob_seg_id);
-    vector<uint8_t> data(800,0x64);
-    //lob->append(ll,data);
+    lob->create_lobseg(lob_seg_id);//创建一个lob段
+    LOBLocator *ll = new LOBLocator();
+    lob->create_locator(ll,lob_seg_id);
+    uint8_t data[10000];
+    uint8_t c = 'A';
+    for(int i = 0; i < 10000;i++){
+        if(data[i-1] >= 'z'){
+            c = 'A';
+        }
+        data[i] = c++;
+    }
+    lob->append(ll,data,3500);
     vector<uint8_t> data2(4000,0x65);
     //lob->append(ll,data2);
     return 0;
 }
 
 int main(){
-    a_single_fun_to_test_VFS();
+    //a_single_fun_to_test_VFS();
+    test_lob();
     exit(1);
 }
 
