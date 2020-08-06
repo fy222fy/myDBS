@@ -92,6 +92,10 @@ public:
     bool is_inline_full() const {return lpa_nums >= MAX_LPA;}
     void update_version(){LOB_version++;}
     uint32_t get_version() const {return LOB_version;}
+    void clear_all_lpas(){
+        lpa_nums = 0;
+        inrow_data_size = 0;
+    }
 };
 
 
