@@ -70,6 +70,7 @@ Status LinuxFile::Write(uint64_t offset, const uint8_t *data, uint64_t len){
     lseek(fd,offset,SEEK_SET);//将文件指针移动到offset处
     ssize_t write_len = write(fd,data,len);
     if(write_len != len) s.FetalError("系统写入出错，可能是磁盘空间已满或者是超出文件最大限制");
+    Flush();
     return s;
 }
 

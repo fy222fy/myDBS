@@ -19,6 +19,7 @@ private:
     uint32_t type;//LOB类型
     uint8_t mode;//LOB存储方式
     uint64_t data_size;//LOB数据部分的大小
+    uint64_t inrow_data_size;//行内存的lpa，指向的datasize
     uint32_t LOB_checksum;//校验和
 
     uint8_t *data;//行内存的真实数据
@@ -52,15 +53,17 @@ public:
         type = t;
     }
     ~LOBLocator();  
-    void update_head(){    //还需要写一些东西
-        ;
+    void update_head(uint8_t new_mode, uint64_t new_data_size){    //还需要写一些东西
+        mode = new_mode;
+        data_size = new_data_size;
     }
-    Status append_lpas(uint64_t addr, uint32_t data_size){
+    Status append_lpas(uint64_t addr, uint32_t d_size){
         Status s;
         if(lpa_nums > MAX_LPA) s.FetalError("行内数量达到上限了，不要再加了");
         lpas[lpa_nums]= addr;
-        lpas_sizes[lpa_nums] = data_size;
+        lpas_sizes[lpa_nums] = d_size;
         lpa_nums++;
+        inrow_data_size += d_size;
         return s;
     }
     vector<pair<uint64_t, uint64_t>> get_all_lpas(){
@@ -70,22 +73,25 @@ public:
         }
         return result;
     }
+    uint32_t get_lpa_nums() const{return lpa_nums;}
     uint64_t get_LHPA()const{return lhpa;}
     void set_LHPA(uint64_t _lhpa){lhpa = _lhpa;mode=0x12;}
     uint64_t get_LHIPA() const{return lhpa;}
     void set_LHIPA(uint64_t _lhipa) {lhpa = _lhipa;mode=0x13;}
-    void set_mode(uint8_t new_mode){mode = new_mode;}
+    void set_data_size(uint64_t d_size) {data_size = d_size;}
     uint8_t get_mode() const {return mode;}
     uint8_t *get_data() {return data;}
-    void set_data(uint8_t *new_data, uint64_t len){
+    void set_data(uint8_t *new_data){
         free_data();
         data = new_data;
-        data_size = len;
     }
-    void free_data(){delete[] data;}
+    void free_data() {delete[] data;}
     uint64_t get_data_size() const {return data_size;}
+    uint64_t get_inrow_data_size() const {return inrow_data_size;}
     uint32_t get_seg_id() const {return segID;}
     bool is_inline_full() const {return lpa_nums >= MAX_LPA;}
+    void update_version(){LOB_version++;}
+    uint32_t get_version() const {return LOB_version;}
 };
 
 

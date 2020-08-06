@@ -20,11 +20,12 @@ struct LHIP;
 struct LOBP
 {
     LOBP(const uint8_t *dta, uint64_t l):data(dta),data_size(l),checksum(1280262656),type(0x00){}
-    LOBP():data_size(0),checksum(0),type(0x00){}
+    LOBP():data_size(0),checksum(0),type(0x00),version(0x00){}
     
     ~LOBP(){}
     uint64_t data_size;
     uint32_t checksum;
+    uint32_t version;//版本号
     uint8_t type;
     const uint8_t *data;
     static const uint32_t HEAD_SIZE = 12;//LOB页头结构的大小
@@ -59,12 +60,13 @@ private:
 */
 struct LHP
 {
-    LHP():data_size(0),nums(0),checksum(1279807488),type(0x01){}
+    LHP():data_size(0),nums(0),checksum(1279807488),type(0x01),version(0x00){}
     ~LHP(){vector<pair<uint64_t,uint64_t>>().swap(M);}
     uint32_t nums;//LHP中lpa的个数
     uint32_t checksum;
     uint8_t type;//本LHP是用来做什么的
     uint64_t data_size;
+    uint32_t version;//版本号
     vector<pair<uint64_t,uint64_t>> M;
     static const uint32_t HEAD_SIZE = 8;
     static const uint64_t LHP_SIZE = VFS::PAGE_FREE_SPACE;
@@ -74,7 +76,7 @@ struct LHP
         data_size += size;
         nums++;
     }//加入一个lpa
-    
+
     void Serialize(uint8_t *result){
         Convert convert;
         uint8_t *temp = convert.int32_to_int8(nums);
@@ -110,6 +112,7 @@ struct LHP
     }
     bool is_full()const{return nums >= MAX_LPA;}
     uint64_t get_data_size()const{return data_size;}
+    vector<pair<uint64_t,uint64_t>> get_all_lpas(){return M;}
 };
 
 /**
@@ -120,12 +123,13 @@ struct LHP
 */
 struct LHIP
 {
-    LHIP():nums(0),checksum(1279805776),type(0x02){}
+    LHIP():nums(0),checksum(1279805776),type(0x02),version(0x00),data_size(0){}
     ~LHIP(){vector<pair<uint64_t,uint64_t>>().swap(M);}
     uint32_t nums;
     uint32_t checksum;
     uint64_t data_size;
     uint8_t type;//类型
+    uint32_t version;//版本号
     vector<pair<uint64_t,uint64_t>> M;
     static const uint32_t HEAD_SIZE = 8;
     static const uint64_t LHIP_SIZE = VFS::PAGE_FREE_SPACE;
@@ -135,14 +139,16 @@ struct LHIP
         data_size += size;
     }//加入一个lpa
     uint64_t read_last_lhpa(){ return M[nums-1].first;}
-    void remove_last_lhpa(){M.pop_back();nums-=1;}
+    void remove_last_lhpa(){data_size -= M[nums-1].second; M.pop_back(); nums-=1;}
     void Serialize(uint8_t *result){
         Convert convert;
-        uint8_t *temp = convert.int32_to_int8(nums);
         int it = 0;
+        uint8_t *temp = convert.int32_to_int8(nums);
         for(int i = 0; i < 4;i++) result[it++] = temp[i];
         temp = convert.int32_to_int8(checksum);
         for(int i = 0; i < 4;i++) result[it++] = temp[i];
+        temp = convert.int64_to_int8(data_size);
+        for(int i = 0; i < 8;i++) result[it++] = temp[i];
         for(int j = 0; j < nums; j++){
             temp = convert.int64_to_int8(M[j].first); //序列化lhpa
             for(int i = 0; i < 8;i++) result[it++] = temp[i];
@@ -157,6 +163,8 @@ struct LHIP
         it+=4;
         checksum = convert.int8_to_int32(input,it);
         it+=4;
+        data_size = convert.int8_to_int64(input,it);
+        it+=8;
         for(int i = 0;i < nums; i++){
             uint64_t addr = convert.int8_to_int64(input,it);
             it+=8;
@@ -165,6 +173,7 @@ struct LHIP
             M.emplace_back(make_pair(addr,size));
         }
     }
+    vector<pair<uint64_t,uint64_t>> get_all_lhps(){return M;}
 };
 ///LOB模块，负责LOB的读写等操作，主要是根据locator操作
 ///
