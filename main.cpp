@@ -163,49 +163,29 @@ int test_lob(){
             c = '0';
         }
         data[i] = c++;
-        if(i == 81){
-            data[i] = 'A';
-            data[i-1] = 'Z';
+        if(i == 101 || i == 501 || i== 1001){
+            data[i] = 'Y';
+            data[i-1] = 'F';
         }
     }
-
-    lob->append(ll,data,30);
-    lob->append(ll,data,800);
-    lob->append(ll,data,3500);
+    lob->append(ll,data,300);
+    
     uint8_t result[1000];
-    lob->read(ll,660,110,result);
-    vector<uint8_t> data2(4000,0x65);
+    //lob->read(ll,505,500,result);
+    uint8_t data2[10000];
+    uint8_t c2 = 'A';
+    for(int i = 0; i < 10000; i++){
+        if(data2[i-1] >= 'z'){
+            c2 = 'A';
+        }
+        data2[i] = c2++;
+    }
+    lob->write(ll,105,data2,50);
+    lob->read(ll,100,100,result);
     //lob->append(ll,data2);
     return 0;
 }
-vector<int> asteroidCollision(vector<int>& asteroids) {
-    vector<int> res;
-    int plus = 0;
-    for(int i = 0 ; i < asteroids.size()-1; i++ ){
-        if(asteroids[i] > 0 && asteroids[i+1] < 0){
-            if(asteroids[i] > -1 * asteroids[i+1]){
-                asteroids.erase(asteroids.begin()+i+1); //删除a中第1个（从第0个算起）到第2个元素，也就是说删除的元素从a.begin()+1算起（包括它）一直到a.begin()+         3（不包括它）
-                i=i-1;
-                //cout<<i;
-                continue;
-            }else if(asteroids[i] < -1 * asteroids[i+1]){
-                asteroids.erase(asteroids.begin()+i); 
-                i--;
-                i--;
-                // cout<<i;
-                continue;
-            }else{
-                asteroids.erase(asteroids.begin()+i); 
-                asteroids.erase(asteroids.begin()+i);
-                //i--; 
-                cout<<i;
-                continue;
-            }
-        }
 
-    }
-    return asteroids;
-}
 int main(){
     //a_single_fun_to_test_VFS();
     test_lob();
