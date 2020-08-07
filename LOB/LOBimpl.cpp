@@ -145,13 +145,15 @@ Status LOBimpl::append(LOBLocator *ll, const uint8_t *data, uint64_t len){
 Status LOBimpl::write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, uint64_t len){
     Status s;
     if(data_off > ll->get_data_size()) s.FetalError("要写入的位置比原长度还要大，请核实");
+    uint64_t modify_len = min(len,ll->get_data_size()-data_off);//缩减
+    uint64_t extra_len = len - modify_len;
     //首先先从行内lpa找，然后再去LHP等结构找
-    uint64_t modify_len = min(data_off + len, ll->get_data_size());//这是当前修改的长度
     if(ll->get_mode() == 0x10){
         uint8_t temp[ll->get_data_size()];
-        memcpy(temp,ll->get_data(),data_off);//原来的数据的前半部分
-        memcpy(temp+data_off,data,modify_len);
-        append(ll,data+modify_len,len-modify_len);//剩余操作用append处理。
+        memcpy(temp,ll->get_data(),ll->get_data_size());//先全部复制过来
+        memcpy(temp,data,modify_len);
+        ll->set_data(temp);
+        ll->update_head(0x10,ll->get_data_size());//重设大小
     }
     else if(ll->get_mode() == 0x11){
         uint64_t result_off = 0;
@@ -173,7 +175,7 @@ Status LOBimpl::write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, ui
                 uint64_t temp_off = data_off - cur_off;
                 uint8_t temp[LOB_PAGE_SIZE];
                 read_lobpage(ll->get_seg_id(),item.first,temp,item.second);
-                if(temp_off + len < item.second){//如果本块内就够读取
+                if(temp_off + modify_len < item.second){//如果本块内就够读取
                     memcpy(temp+temp_off,data,len);
                     uint64_t offset;
                     create_lobpage(ll->get_seg_id(),offset,temp,LOB_PAGE_SIZE);
@@ -193,7 +195,7 @@ Status LOBimpl::write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, ui
                 }
             }
             if(state == 2){//处在读取状态，连续读取，并判断是不是读到最后一个块了
-                if(cur_off + LOB_PAGE_SIZE > data_off + len){//已经读到最后一个块了
+                if(cur_off + LOB_PAGE_SIZE > data_off +modify_len){//已经读到最后一个块了
                     state = 3;
                 }
                 else{
@@ -240,7 +242,7 @@ Status LOBimpl::write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, ui
                 uint64_t temp_off = data_off - cur_off;
                 uint8_t temp[LOB_PAGE_SIZE];
                 read_lobpage(ll->get_seg_id(),item.first,temp,item.second);
-                if(temp_off + len < item.second){//如果本块内就够读取
+                if(temp_off +modify_len < item.second){//如果本块内就够读取
                     memcpy(temp+temp_off,data,len);
                     uint64_t offset;
                     create_lobpage(ll->get_seg_id(),offset,temp,LOB_PAGE_SIZE);
@@ -260,7 +262,7 @@ Status LOBimpl::write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, ui
                 }
             }
             if(state == 2){//处在读取状态，连续读取，并判断是不是读到最后一个块了
-                if(cur_off + LOB_PAGE_SIZE > data_off + len){//已经读到最后一个块了
+                if(cur_off + LOB_PAGE_SIZE > data_off +modify_len){//已经读到最后一个块了
                     state = 3;
                 }
                 else{
@@ -313,7 +315,7 @@ Status LOBimpl::write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, ui
                     uint64_t temp_off = data_off - cur_off;
                     uint8_t temp[LOB_PAGE_SIZE];
                     read_lobpage(ll->get_seg_id(),item.first,temp,item.second);
-                    if(temp_off + len < item.second){//如果本块内就够读取
+                    if(temp_off +modify_len < item.second){//如果本块内就够读取
                         memcpy(temp+temp_off,data,len);
                         uint64_t offset;
                         create_lobpage(ll->get_seg_id(),offset,temp,LOB_PAGE_SIZE);
@@ -333,7 +335,7 @@ Status LOBimpl::write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, ui
                     }
                 }
                 if(state == 2){//处在读取状态，连续读取，并判断是不是读到最后一个块了
-                    if(cur_off + LOB_PAGE_SIZE > data_off + len){//已经读到最后一个块了
+                    if(cur_off + LOB_PAGE_SIZE > data_off +modify_len){//已经读到最后一个块了
                         state = 3;
                     }
                     else{
@@ -365,10 +367,8 @@ Status LOBimpl::write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, ui
         append_LHIP(ll->get_seg_id(),lhipa,new_lhip);//写新的lhip
         ll->set_LHIPA(lhipa);
     }
-
-
-    if(modify_len <= data_off + len){//如果还有部分没有搞定,剩余的以append形式处理
-        append(ll,data+modify_len,data_off+len-modify_len);
+    if(extra_len > 0){//如果还有部分没有搞定,剩余的以append形式处理
+        append(ll,data+modify_len,extra_len);
     }
     return s;
 }
@@ -489,7 +489,242 @@ Status LOBimpl::read(LOBLocator *ll, uint64_t amount, uint64_t data_off, uint8_t
 
 Status LOBimpl::erase(LOBLocator *ll, uint64_t amount, uint64_t data_off){
     Status s;
+    if(data_off > ll->get_data_size()) s.FetalError("要删除的位置比原长度还要大，请核实");
+    if(ll->get_mode() == 0x10){
+        if(data_off + amount < ll->get_data_size()){//如果只有中间一段
+            uint8_t temp[ll->get_data_size()-amount];
+            memcpy(temp,ll->get_data(),data_off);
+            memcpy(temp,ll->get_data() + data_off + amount, ll->get_data_size()-data_off-amount);
+            ll->set_data(temp);
+            ll->update_head(0x10,ll->get_data_size()-amount);//重设大小
+        }
+        else{
+            uint8_t temp[data_off];
+            memcpy(temp,ll->get_data(),data_off);
+            ll->set_data(temp);
+            ll->update_head(0x10,data_off);
+        }
+    }
+    else if(ll->get_mode() == 0x11){
+        uint64_t result_off = 0;
+        uint64_t cur_off = 0;
+        auto lpas = ll->get_all_lpas();//获得所有的lpa
+        ll->clear_all_lpas();
+        int state = 0;
+        for(auto item : lpas){
+            if(state == 0){//还没找到位置，持续跳过
+                if(cur_off + item.second > data_off){
+                    state = 1;
+                }
+                else {
+                    cur_off += item.second;
+                    ll->append_lpas(item.first,item.second);
+                }
+            }
+            if(state == 1){//找到了第一个位置，处理第一个块的后半个部分
+                uint64_t temp_off = data_off - cur_off;
+                uint8_t temp[LOB_PAGE_SIZE];
+                read_lobpage(ll->get_seg_id(),item.first,temp,item.second);
+                if(temp_off + amount < item.second){//如果本块内就够读取
+                    memmove(temp+temp_off,temp+temp_off+amount,item.second-temp_off-amount);//删除中间的一段数据
+                    uint64_t offset;
+                    create_lobpage(ll->get_seg_id(),offset,temp,item.second-amount);
+                    ll->append_lpas(offset,item.second-amount);
+                    cur_off += item.second-amount;
+                    state = 4;//结束
+                    continue;
+                }
+                else {
+                    uint64_t offset;
+                    create_lobpage(ll->get_seg_id(),offset,temp,temp_off);
+                    ll->append_lpas(offset,temp_off);
+                    cur_off += temp_off;
+                    state = 2;
+                    continue;
+                }
+            }
+            if(state == 2){//处在读取状态，连续读取，并判断是不是读到最后一个块了
+                if(cur_off + LOB_PAGE_SIZE > data_off + amount){//已经读到最后一个块了
+                    state = 3;
+                }
+                else{
+                    continue;//跳过，也就是删除
+                }
+            }
+            if(state == 3){//读到最后一个块了，只处理前半个部分
+                uint8_t temp[item.second];
+                read_lobpage(ll->get_seg_id(),item.first,temp,item.second);//读块
+                uint64_t temp_off = data_off+ amount -cur_off;
+                uint64_t offset;
+                create_lobpage(ll->get_seg_id(),offset,temp,item.second-temp_off);
+                ll->append_lpas(offset,item.second-temp_off);
+                state = 4;
+                continue;
+            }
+            if(state == 4){//已经结束，剩下的所有块依次处理
+                ll->append_lpas(item.first,item.second);
+            } 
+        }
+    }
+    else if(ll->get_mode() == 0x12){
+        uint64_t cur_amount = 0;//当前删除的长度
+        uint64_t cur_off = 0;
+        int state = 0;//表示还没找到位置，0表示找到了开始位置，1表示已经读写完毕
+        LHP lhp, new_lhp;
+        uint64_t lhpa;
+        read_LHP(ll->get_seg_id(),ll->get_LHPA(),lhp);
+        for(auto item:lhp.get_all_lpas()){
+            if(state == 0){//还没找到位置，持续跳过
+                if(cur_off + item.second > data_off){
+                    state = 1;
+                }
+                else {
+                    cur_off += item.second;
+                    new_lhp.append(item.first,item.second);
+                }
+            }
+            if(state == 1){//找到了第一个位置，处理第一个块的后半个部分
+                uint64_t temp_off = data_off - cur_off;
+                uint8_t temp[LOB_PAGE_SIZE];
+                read_lobpage(ll->get_seg_id(),item.first,temp,item.second);
+                if(temp_off + amount < item.second){//如果本块内就够删除
+                    memmove(temp+temp_off,temp+temp_off+amount,item.second-temp_off-amount);//删除中间的一段数据
+                    uint64_t offset;
+                    create_lobpage(ll->get_seg_id(),offset,temp,item.second-amount);
+                    new_lhp.append(offset,item.second-amount);
+                    cur_off += item.second - amount;
+                    state = 4;//结束
+                    continue;
+                }
+                else {
+                    uint64_t offset;
+                    create_lobpage(ll->get_seg_id(),offset,temp,temp_off);
+                    new_lhp.append(offset,temp_off);
+                    cur_off += temp_off;
+                    state = 2;
+                    continue;
+                }
+            }
+            if(state == 2){//处在读取状态，连续跳过，并判断是不是读到最后一个块了
+                if(cur_off + LOB_PAGE_SIZE > data_off + amount){//已经读到最后一个块了
+                    state = 3;
+                }
+                else{
+                    continue;//跳过，也就是删除
+                }
+            }
+            if(state == 3){//读到最后一个块了，只删除前半个部分
+                uint8_t temp[item.second];
+                read_lobpage(ll->get_seg_id(),item.first,temp,item.second);//读块
+                uint64_t temp_off = data_off+ amount - cur_off;
+                uint64_t offset;
+                create_lobpage(ll->get_seg_id(),offset,temp + temp_off, item.second-temp_off);//只写后半部分
+                new_lhp.append(offset,item.second-temp_off);
+                state = 4;
+                continue;
+            }
+            if(state == 4){
+                new_lhp.append(item.first,item.second);
+            }
+        }
+        append_LHP(ll->get_seg_id(),lhpa,new_lhp);
+        ll->set_LHPA(lhpa);
 
+    }
+    else if(ll->get_mode() == 0x13){
+        uint64_t cur_amount = 0;//当前删除的长度
+        uint64_t cur_off = 0;
+        LHIP lhip,new_lhip; 
+        LHP new_lhp;//这是新的lhp，不能直接参与到循环中， 因为和原有lhp不同步
+        read_LHIP(ll->get_seg_id(),ll->get_LHIPA(),lhip);//首先读出来lhip，之后不覆盖写，重写
+        int state = 0;//表示还没找到位置，0表示找到了开始位置，1表示已经删除完毕
+        for(auto lhps:lhip.get_all_lhps()){
+            LHP lhp;
+            uint64_t lhpa;
+            read_LHP(ll->get_seg_id(),lhps.first,lhp);
+            for(auto item:lhp.get_all_lpas()){
+                if(new_lhp.is_full()){//LHP满了，要换一个
+                    uint64_t new_lhpa;
+                    append_LHP(ll->get_seg_id(),new_lhpa,new_lhp);
+                    new_lhip.append(new_lhpa,new_lhp.data_size);
+                    new_lhp = LHP();//重新建一个lhp，然后写
+                }
+                if(state == 0){//还没找到位置，持续跳过
+                    if(cur_off + item.second > data_off){
+                        state = 1;
+                    }
+                    else {
+                        cur_off += item.second;
+                        new_lhp.append(item.first,item.second);
+                    }
+                }
+                if(state == 1){//找到了第一个位置，处理第一个块的后半个部分
+                    uint64_t temp_off = data_off - cur_off;
+                    uint8_t temp[LOB_PAGE_SIZE];
+                    read_lobpage(ll->get_seg_id(),item.first,temp,item.second);
+                    if(temp_off + amount < item.second){//如果本块内就够删除
+                        memmove(temp+temp_off,temp+temp_off+amount,item.second-temp_off-amount);//删除中间的一段数据
+                        uint64_t offset;
+                        create_lobpage(ll->get_seg_id(),offset,temp,item.second-amount);
+                        new_lhp.append(offset,item.second-amount);
+                        cur_off += item.second - amount;
+                        state = 4;//结束
+                        continue;
+                    }
+                    else {
+                        uint64_t offset;
+                        create_lobpage(ll->get_seg_id(),offset,temp,temp_off);
+                        new_lhp.append(offset,temp_off);
+                        cur_off += temp_off;
+                        state = 2;
+                        continue;
+                    }
+                }
+                if(state == 2){//处在读取状态，连续跳过，并判断是不是读到最后一个块了
+                    if(cur_off + LOB_PAGE_SIZE > data_off + amount){//已经读到最后一个块了
+                        state = 3;
+                    }
+                    else{
+                        continue;//跳过，也就是删除
+                    }
+                }
+                if(state == 3){//读到最后一个块了，只删除前半个部分
+                    uint8_t temp[item.second];
+                    read_lobpage(ll->get_seg_id(),item.first,temp,item.second);//读块
+                    uint64_t temp_off = data_off+ amount - cur_off;
+                    uint64_t offset;
+                    create_lobpage(ll->get_seg_id(),offset,temp + temp_off, item.second-temp_off);//只写后半部分
+                    new_lhp.append(offset,item.second-temp_off);
+                    state = 4;
+                    continue;
+                }
+                if(state == 4){
+                    new_lhp.append(item.first,item.second);
+                }
+            }
+        }
+        //最后要判断一下有没有必要继续使用二级的索引，可以退化
+        if(new_lhip.nums == 1){//表明只有一个lhp，那么一级索引就可以
+            uint64_t llhpa = new_lhip.read_last_lhpa();//读出来
+            LHP temp_lhp;
+            read_LHP(ll->get_seg_id(),llhpa,temp_lhp);
+            if(temp_lhp.nums < LOBLocator::MAX_LPA){//航内存就够了
+                ll->update_head(0x11,new_lhip.data_size);
+            }
+            else{//要一级索引
+                ll->set_LHPA(new_lhip.read_last_lhpa());
+                ll->update_head(0x12,new_lhip.data_size);
+            }
+            
+        }
+        else{
+            uint64_t lhipa;
+            append_LHIP(ll->get_seg_id(),lhipa,new_lhip);//写新的lhip
+            ll->set_LHIPA(lhipa);
+            ll->update_head(0x13,lhip.data_size);
+        }
+        
+    }
     return s;
 }
 Status LOBimpl::drop(LOBLocator *ll){
