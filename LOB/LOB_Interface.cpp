@@ -62,7 +62,9 @@ Status LOB::FRAGMENT_MOVE(LOBLocator *lob_loc, uint64_t amount, uint64_t src_off
 }
 
 Status LOB::FRAGMENT_REPLACE(LOBLocator *lob_loc, uint64_t old_amount, uint64_t new_amount, uint64_t offset, const uint8_t *data){
-
+    Status s;
+    
+    return s;
 }
 
 

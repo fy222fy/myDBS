@@ -9,7 +9,7 @@
 struct LOBLocator{
 public:
     static const uint32_t MAX_LPA = 6;//设置行内最多有多少个LPA
-    static const uint32_t INLINE_MAX_SIZE = 100;//设置行内数据最大长度
+    static const uint32_t INLINE_MAX_SIZE = LOBimpl::LOB_PAGE_SIZE;//设置行内数据最大长度
 private:
     uint8_t Locator_version;//locator的版本号，用于未来升级
     uint32_t size;//locator的大小，B为单位

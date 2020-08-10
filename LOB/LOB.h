@@ -111,6 +111,7 @@ struct LHP
         }
     }
     bool is_full()const{return nums >= MAX_LPA;}
+    bool is_empty()const{return nums == 0;}
     uint64_t get_data_size()const{return data_size;}
     vector<pair<uint64_t,uint64_t>> get_all_lpas(){return M;}
 };
@@ -180,7 +181,7 @@ struct LHIP
 ///
 class LOBimpl{
 public:
-    LOBimpl();
+    LOBimpl(LOBLocator *ll);
     //创建一个空的LOcator
     Status create_locator(LOBLocator *llp, uint32_t seg_id);
     //创建一个空的段
@@ -189,24 +190,25 @@ public:
     /// \param ll lOBLocator
     /// \param data 要追加的数据
     /// \param len 需要追加的长度
-    Status append(LOBLocator *ll, const uint8_t *data, uint64_t len);//追加数据，并修改locator结构
+    Status append(const uint8_t *data, uint64_t len);//追加数据，并修改locator结构
     /// 插入数据
     /// \param ll lOBLocator
     /// \param data_off 从什么地方开始写入
     /// \param data 要写入的数据
     /// \param len 需要写入的长度
-    Status insert(LOBLocator *ll, uint64_t data_off, const uint8_t *data, uint64_t len);//覆写数据
+    Status insert(uint64_t data_off, const uint8_t *data, uint64_t len);//覆写数据
     /// 读取数据
     /// \param ll lOBLocator
     /// \param data_off 从什么地方开始读取
     /// \param result 传出读取的数据
     /// \param amount 要读取的数据长度
-    Status read(LOBLocator *ll, uint64_t data_off, uint8_t *result, uint64_t amount);//读取数据
+    Status read(uint64_t data_off, uint8_t *result, uint64_t amount);//读取数据
     /// 擦除数据
     /// \param ll lOBLocator
     /// \param data_off 从什么地方开始擦除
     /// \param amount 要擦除的数据长度
-    Status erase(LOBLocator *ll, uint64_t data_off, uint64_t amount);//删除部分数据    
+    Status erase(uint64_t data_off, uint64_t amount);//删除部分数据    
+    Status finish();//完成操作，统一写入。
     static const uint64_t LOB_PAGE_SIZE = VFS::PAGE_FREE_SPACE - LOBP::HEAD_SIZE;
     static const uint64_t LHP_SIZE = VFS::PAGE_FREE_SPACE - LOBP::HEAD_SIZE;
     static const uint64_t LHP_NUMS = LHP_SIZE / 16;
@@ -217,26 +219,50 @@ public:
     static const uint64_t OUTLINE_3_MAX_SIZE = LHPI_NUMS * LHP_NUMS * LOB_PAGE_SIZE;
 private:
     Options *op;
-    uint32_t checksum(LOBLocator *ll);//校验和计算
+    uint32_t checksum();//校验和计算
     //在指定段上创建一个lob页，然后写入指定长度的数据 
-    Status create_lobpage(uint32_t segid, uint64_t &offset, const uint8_t *data, uint64_t len);
+    Status create_lobpage(uint64_t &offset, const uint8_t *data, uint64_t len);
     //Status append_lobpage(uint32_t &offset, LOBP *lobp);
-    Status write_lobpage(uint32_t segid, uint64_t offset, const uint8_t *data, uint64_t len);
-    Status read_lobpage(uint32_t segid, uint64_t offset, uint8_t *output, uint64_t len);
+    Status write_lobpage( uint64_t offset, const uint8_t *data, uint64_t len);
+    Status read_lobpage(uint64_t offset, uint8_t *output, uint64_t len);
     Status free_lobpage(uint32_t offset);
-    //Status create_LHP(LHP **lhp);
-    Status append_LHP(uint32_t segid, uint64_t &offset, LHP lhp);
-    Status write_LHP(uint32_t segid, uint64_t offset, LHP lhp);
-    Status read_LHP(uint32_t segid, uint64_t offset, LHP &lhp);
-    Status free_LHP();
-    //Status create_LHIP(LHIP **lhip);
-    Status append_LHIP(uint32_t segid, uint64_t &offset, LHIP lhip);
-    Status write_LHIP(uint32_t segid, uint64_t offset, LHIP lhip);
-    Status read_LHIP(uint32_t segid, uint64_t offset, LHIP &lhip);
-    Status free_LHIP();
+    Status append_LHP(uint64_t &offset,LHP lhp);
+    Status write_LHP(uint64_t offsetp,LHP lhp);
+    Status read_LHP(uint64_t offset, LHP &lhp);
+    Status free_LHP(LHP &lhp);
+    Status append_LHIP(uint64_t &offset, LHIP lhip);
+    Status write_LHIP(uint64_t offset, LHIP lhip);
+    Status read_LHIP(uint64_t offset, LHIP &lhip);
+    Status free_LHIP( LHIP &lhip);
     uint32_t new_lob_id();
     //在out-1结构中插入数据，如果能全部插入就全部插入，否则插满返回即可
-    Status insert_out1(LOBLocator *ll,const uint8_t *data);
+    Status insert_out1(const uint8_t *data);
+    LOBLocator *ll;//一个lobimpl负责一个locator的操作
+    uint32_t segid;//locator对应的段id
+    uint32_t cur_version;//表示这次的实施的版本号
+    uint8_t mode;
+    vector<pair<uint64_t,uint64_t>> all_lpa;//保存了所有的lpa
+    bool if_inrow;
+    uint8_t *inrow_data;//不断用到的data
+    uint64_t inrow_data_size;//临时用的data的size
+    uint64_t data_size;//数据的大小
+    void set_inrow_data(uint8_t *new_data, uint64_t len){
+        free_inrow_data();
+        inrow_data = new uint8_t[len];
+        memcpy(inrow_data,new_data,len);
+        inrow_data_size = len;
+        if_inrow = true;
+    }
+    void free_inrow_data(){
+        if(inrow_data != nullptr){
+            delete[] inrow_data; 
+            inrow_data = nullptr;
+        } 
+        inrow_data_size = 0;
+        if_inrow = false;
+    }
+    void add_lpa(uint64_t addr,uint64_t size){all_lpa.emplace_back(make_pair(addr,size));}
+
 };
 
 //LOB接口
