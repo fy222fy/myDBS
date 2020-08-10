@@ -49,7 +49,7 @@ Status LOBimpl::append(LOBLocator *ll, const uint8_t *data, uint64_t len){
         memcpy(temp,ll->get_data(),ll->get_data_size());
         memcpy(temp+ll->get_data_size(),data,temp_size - ll->get_data_size());
         beg += temp_size - ll->get_data_size();
-        ll->set_data(temp);
+        ll->set_data(temp,temp_size);
         ll->update_head(0x10,temp_size);//更新头部
         if(beg < len){
             //首先把data单独写进一个块，构造LPA
@@ -142,7 +142,7 @@ Status LOBimpl::append(LOBLocator *ll, const uint8_t *data, uint64_t len){
     }
     //不管最终模式如何，再次更新一次locator
 }
-Status LOBimpl::write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, uint64_t len){
+Status LOBimpl::insert(LOBLocator *ll, uint64_t data_off, const uint8_t *data, uint64_t len){
     Status s;
     if(data_off > ll->get_data_size()) s.FetalError("要写入的位置比原长度还要大，请核实");
     uint64_t modify_len = min(len,ll->get_data_size()-data_off);//缩减
@@ -151,8 +151,8 @@ Status LOBimpl::write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, ui
     if(ll->get_mode() == 0x10){
         uint8_t temp[ll->get_data_size()];
         memcpy(temp,ll->get_data(),ll->get_data_size());//先全部复制过来
-        memcpy(temp,data,modify_len);
-        ll->set_data(temp);
+        memcpy(temp + data_off,data,modify_len);
+        ll->set_data(temp,ll->get_data_size());
         ll->update_head(0x10,ll->get_data_size());//重设大小
     }
     else if(ll->get_mode() == 0x11){
@@ -173,23 +173,23 @@ Status LOBimpl::write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, ui
             }
             if(state == 1){//找到了第一个位置，处理第一个块的后半个部分
                 uint64_t temp_off = data_off - cur_off;
-                uint8_t temp[LOB_PAGE_SIZE];
+                uint8_t temp[item.second];
                 read_lobpage(ll->get_seg_id(),item.first,temp,item.second);
-                if(temp_off + modify_len < item.second){//如果本块内就够读取
-                    memcpy(temp+temp_off,data,len);
+                if(temp_off + modify_len < item.second){//如果本块内就够写完
+                    memcpy(temp+temp_off,data,modify_len);
                     uint64_t offset;
-                    create_lobpage(ll->get_seg_id(),offset,temp,LOB_PAGE_SIZE);
-                    ll->append_lpas(offset,LOB_PAGE_SIZE);
-                    cur_off += LOB_PAGE_SIZE;
+                    create_lobpage(ll->get_seg_id(),offset,temp,item.second);
+                    ll->append_lpas(offset,item.second);
+                    cur_off += item.second;
                     state = 4;//结束
                     continue;
                 }
                 else {
-                    memcpy(temp+temp_off,data,LOB_PAGE_SIZE-temp_off);//替换数据
+                    memcpy(temp+temp_off,data,item.second-temp_off);//替换数据
                     uint64_t offset;
-                    create_lobpage(ll->get_seg_id(),offset,temp,LOB_PAGE_SIZE);
-                    ll->append_lpas(offset,LOB_PAGE_SIZE);
-                    cur_off += LOB_PAGE_SIZE;
+                    create_lobpage(ll->get_seg_id(),offset,temp,item.second);
+                    ll->append_lpas(offset,item.second);
+                    cur_off += item.second;
                     state = 2;
                     continue;
                 }
@@ -372,16 +372,16 @@ Status LOBimpl::write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, ui
     }
     return s;
 }
-Status LOBimpl::read(LOBLocator *ll, uint64_t amount, uint64_t data_off, uint8_t *result){
+Status LOBimpl::read(LOBLocator *ll, uint64_t data_off, uint8_t *result, uint64_t amount){
     Status s;
-    if(ll->get_data_size() - data_off < amount) s.FetalError("要读取的长度太大，没这么长的数据");
+    if(data_off > ll->get_data_size() || ll->get_data_size() - data_off < amount) s.FetalError("要读取的长度太大，没这么长的数据");
     if(ll->get_mode() == 0x10){
         memcpy(result,ll->get_data() + data_off,amount);
         return s;
     }
     else if(ll->get_mode() == 0x11 || data_off + amount < ll->get_inrow_data_size()){//这两种情况都可以在行内找
         //首先定位到是哪一个
-        uint8_t temp_result[ll->get_inrow_data_size()];
+        uint8_t temp_result[ll->get_data_size()];
         uint64_t temp_off = 0;
         for(auto item:ll->get_all_lpas()){
             uint8_t temp[item.second];
@@ -487,21 +487,22 @@ Status LOBimpl::read(LOBLocator *ll, uint64_t amount, uint64_t data_off, uint8_t
 
 
 
-Status LOBimpl::erase(LOBLocator *ll, uint64_t amount, uint64_t data_off){
+Status LOBimpl::erase(LOBLocator *ll, uint64_t data_off, uint64_t amount){
     Status s;
     if(data_off > ll->get_data_size()) s.FetalError("要删除的位置比原长度还要大，请核实");
+    if(data_off + amount > ll->get_data_size()) amount = ll->get_data_size()-data_off;
     if(ll->get_mode() == 0x10){
         if(data_off + amount < ll->get_data_size()){//如果只有中间一段
             uint8_t temp[ll->get_data_size()-amount];
             memcpy(temp,ll->get_data(),data_off);
-            memcpy(temp,ll->get_data() + data_off + amount, ll->get_data_size()-data_off-amount);
-            ll->set_data(temp);
+            memcpy(temp + data_off,ll->get_data() + data_off + amount, ll->get_data_size()-data_off-amount);
+            ll->set_data(temp,ll->get_data_size()-amount);
             ll->update_head(0x10,ll->get_data_size()-amount);//重设大小
         }
         else{
             uint8_t temp[data_off];
             memcpy(temp,ll->get_data(),data_off);
-            ll->set_data(temp);
+            ll->set_data(temp,data_off);
             ll->update_head(0x10,data_off);
         }
     }
@@ -521,16 +522,19 @@ Status LOBimpl::erase(LOBLocator *ll, uint64_t amount, uint64_t data_off){
                     ll->append_lpas(item.first,item.second);
                 }
             }
-            if(state == 1){//找到了第一个位置，处理第一个块的后半个部分
+            if(state == 1){//找到了第一个位置，删除后半段，留前半段
                 uint64_t temp_off = data_off - cur_off;
-                uint8_t temp[LOB_PAGE_SIZE];
+                uint8_t temp[item.second];
                 read_lobpage(ll->get_seg_id(),item.first,temp,item.second);
                 if(temp_off + amount < item.second){//如果本块内就够读取
-                    memmove(temp+temp_off,temp+temp_off+amount,item.second-temp_off-amount);//删除中间的一段数据
+                    uint8_t temp_new[item.second-amount];
+                    memcpy(temp_new,temp,temp_off);
+                    memcpy(temp_new+temp_off,temp+temp_off+amount,item.second-amount-temp_off);
                     uint64_t offset;
-                    create_lobpage(ll->get_seg_id(),offset,temp,item.second-amount);
+                    create_lobpage(ll->get_seg_id(),offset,temp_new,item.second-amount-temp_off);
                     ll->append_lpas(offset,item.second-amount);
                     cur_off += item.second-amount;
+                    ll->update_head(0x11,ll->get_data_size()-amount);//更新长度
                     state = 4;//结束
                     continue;
                 }
@@ -538,7 +542,7 @@ Status LOBimpl::erase(LOBLocator *ll, uint64_t amount, uint64_t data_off){
                     uint64_t offset;
                     create_lobpage(ll->get_seg_id(),offset,temp,temp_off);
                     ll->append_lpas(offset,temp_off);
-                    cur_off += temp_off;
+                    cur_off += item.second;//这里要跳过删除之前的长度
                     state = 2;
                     continue;
                 }
@@ -551,7 +555,7 @@ Status LOBimpl::erase(LOBLocator *ll, uint64_t amount, uint64_t data_off){
                     continue;//跳过，也就是删除
                 }
             }
-            if(state == 3){//读到最后一个块了，只处理前半个部分
+            if(state == 3){//读到最后一个块了，只处理后半部分写入
                 uint8_t temp[item.second];
                 read_lobpage(ll->get_seg_id(),item.first,temp,item.second);//读块
                 uint64_t temp_off = data_off+ amount -cur_off;
@@ -565,6 +569,7 @@ Status LOBimpl::erase(LOBLocator *ll, uint64_t amount, uint64_t data_off){
                 ll->append_lpas(item.first,item.second);
             } 
         }
+        ll->update_head(0x11,ll->get_inrow_data_size());
     }
     else if(ll->get_mode() == 0x12){
         uint64_t cur_amount = 0;//当前删除的长度
@@ -725,10 +730,6 @@ Status LOBimpl::erase(LOBLocator *ll, uint64_t amount, uint64_t data_off){
         }
         
     }
-    return s;
-}
-Status LOBimpl::drop(LOBLocator *ll){
-    Status s;
     return s;
 }
 ///////////////////////private function///////////////////////

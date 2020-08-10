@@ -9,7 +9,7 @@
 struct LOBLocator{
 public:
     static const uint32_t MAX_LPA = 6;//设置行内最多有多少个LPA
-    static const uint32_t INLINE_MAX_SIZE = 20;//设置行内数据最大长度
+    static const uint32_t INLINE_MAX_SIZE = 100;//设置行内数据最大长度
 private:
     uint8_t Locator_version;//locator的版本号，用于未来升级
     uint32_t size;//locator的大小，B为单位
@@ -81,9 +81,10 @@ public:
     void set_data_size(uint64_t d_size) {data_size = d_size;}
     uint8_t get_mode() const {return mode;}
     uint8_t *get_data() {return data;}
-    void set_data(uint8_t *new_data){
+    void set_data(uint8_t *new_data, uint64_t len){
         free_data();
-        data = new_data;
+        data = new uint8_t[len];
+        memcpy(data,new_data,len);
     }
     void free_data() {delete[] data;}
     uint64_t get_data_size() const {return data_size;}

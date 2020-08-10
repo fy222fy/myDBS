@@ -181,13 +181,32 @@ struct LHIP
 class LOBimpl{
 public:
     LOBimpl();
-    Status create_locator(LOBLocator *llp, uint32_t seg_id);//创建一个空的lob，获取locator
-    Status create_lobseg(uint32_t &seg_id);//创建一个lob段，获取段的id
+    //创建一个空的LOcator
+    Status create_locator(LOBLocator *llp, uint32_t seg_id);
+    //创建一个空的段
+    Status create_lobseg(uint32_t &seg_id);
+    /// 追加数据
+    /// \param ll lOBLocator
+    /// \param data 要追加的数据
+    /// \param len 需要追加的长度
     Status append(LOBLocator *ll, const uint8_t *data, uint64_t len);//追加数据，并修改locator结构
-    Status write(LOBLocator *ll, uint64_t data_off, const uint8_t *data, uint64_t len);//覆写数据
-    Status read(LOBLocator *ll, uint64_t amount, uint64_t data_off, uint8_t *result);//读取数据
-    Status erase(LOBLocator *ll, uint64_t amount, uint64_t data_off);//删除部分数据
-    Status drop(LOBLocator *ll);//删除指向的所有lob数据
+    /// 插入数据
+    /// \param ll lOBLocator
+    /// \param data_off 从什么地方开始写入
+    /// \param data 要写入的数据
+    /// \param len 需要写入的长度
+    Status insert(LOBLocator *ll, uint64_t data_off, const uint8_t *data, uint64_t len);//覆写数据
+    /// 读取数据
+    /// \param ll lOBLocator
+    /// \param data_off 从什么地方开始读取
+    /// \param result 传出读取的数据
+    /// \param amount 要读取的数据长度
+    Status read(LOBLocator *ll, uint64_t data_off, uint8_t *result, uint64_t amount);//读取数据
+    /// 擦除数据
+    /// \param ll lOBLocator
+    /// \param data_off 从什么地方开始擦除
+    /// \param amount 要擦除的数据长度
+    Status erase(LOBLocator *ll, uint64_t data_off, uint64_t amount);//删除部分数据    
     static const uint64_t LOB_PAGE_SIZE = VFS::PAGE_FREE_SPACE - LOBP::HEAD_SIZE;
     static const uint64_t LHP_SIZE = VFS::PAGE_FREE_SPACE - LOBP::HEAD_SIZE;
     static const uint64_t LHP_NUMS = LHP_SIZE / 16;
@@ -230,11 +249,11 @@ public:
     /// \param amount 需要比较的数据长度，以字节为单位
     /// \param offset_1 第一个LOB要比较的的起始位置
     /// \param offset_2 第二个LOB要比较的起始位置
-    Status COMPARE(LOBLocator *lob_1,LOBLocator *lob_2,uint64_t amount, uint64_t offset_1, uint64_t offset_2);
+    bool COMPARE(LOBLocator *lob_1,LOBLocator *lob_2,uint64_t amount, uint64_t offset_1, uint64_t offset_2);
     /// 将目标一个LOB附加在另一个LOB后面
     /// \param dest_lob 被附加的目标LOB
     /// \param src_lob 要附加的源LOB
-    Status APPEND(LOBLocator *dest_lob, LOBLocator src_lob);
+    Status APPEND(LOBLocator *dest_lob, LOBLocator *src_lob);
     /// 将src lob的指定数据copy到dest lob的指定偏移上
     /// \param dest_lob 目标LOB指示器
     /// \param src_lob 源LOB指示器

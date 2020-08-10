@@ -147,6 +147,23 @@ void a_single_fun_to_test_VFS(){
     test_vfs_append(2);
 }
 
+void construct_data(uint8_t *data){
+    uint8_t d = '0';
+    uint8_t c = 'A';
+    for(int i = 0; i < 10000;i++){
+        if(data[i - 1] == '9'){
+            d = '0';
+        }
+        if(data[i - 1] == 'z'){
+            data[i] = d++;
+            c = 'A';
+        }
+        else{
+            data[i] = c++;
+        }
+    }
+}
+
 int test_lob(){
     Env *env = new LinuxEnv();
     Options *op = new Options(env);
@@ -157,31 +174,20 @@ int test_lob(){
     LOBLocator *ll = new LOBLocator();
     lob->create_locator(ll,lob_seg_id);
     uint8_t data[10000];
-    uint8_t c = '0';
-    for(int i = 0; i < 10000;i++){
-        if(data[i-1] >= '9'){
-            c = '0';
-        }
-        data[i] = c++;
-        if(i == 101 || i == 501 || i== 1001){
-            data[i] = 'Y';
-            data[i-1] = 'F';
-        }
-    }
-    lob->append(ll,data,300);
-    
-    uint8_t result[1000];
-    //lob->read(ll,505,500,result);
+    for(int i = 0; i < 10000; i++) data[i] = 'A';
     uint8_t data2[10000];
-    uint8_t c2 = 'A';
-    for(int i = 0; i < 10000; i++){
-        if(data2[i-1] >= 'z'){
-            c2 = 'A';
-        }
-        data2[i] = c2++;
-    }
-    lob->write(ll,105,data2,50);
-    lob->read(ll,100,100,result);
+    for(int i =0;i<10000;i++) data2[i] = 'B';
+    data[50] = 'F';
+    uint8_t result[1000];
+    int a = LOBLocator::INLINE_MAX_SIZE + LOBimpl::OUTLINE_1_MAX_SIZE + LOBimpl::OUTLINE_2_MAX_SIZE +LOBimpl::OUTLINE_3_MAX_SIZE;
+    lob->append(ll,data,200);
+    lob->read(ll,48,result,20);
+    lob->write(ll,52,data2,10);
+    lob->read(ll,48,result,20);
+    lob->erase(ll,51,50);
+    lob->read(ll,48,result,20);
+    lob->append(ll,data,2);
+    lob->read(ll,149,result,3);
     //lob->append(ll,data2);
     return 0;
 }
