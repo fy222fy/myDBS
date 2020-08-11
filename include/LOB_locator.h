@@ -26,16 +26,16 @@ private:
     uint8_t *data;//行内存的真实数据
     uint64_t lpas[MAX_LPA]; //保存所有的lpa以及他们对应的长度
     uint32_t lpa_nums;//保存行内lpa数量
-    uint32_t lpas_sizes[MAX_LPA];
+    uint64_t lpas_sizes[MAX_LPA];
     uint64_t lhpa;//保存lhpa或者lhipa，根据类型决定
 public:
     static const uint32_t HEAD_SIZE = sizeof(size) + sizeof(Locator_version) +
         sizeof(LOBID) + sizeof(LOB_version) + sizeof(type) + sizeof(mode) + 
         sizeof(data_size) + sizeof(LOB_checksum);
     //将locator序列化成一段数据
-    static Status Serialize(uint8_t *result, LOBLocator **ll);
+    Status Serialize(uint8_t *result);
     //将一段数据反序列化成一个loblocator结构
-    static Status Deserialize(const uint8_t *input, LOBLocator *ll);
+    Status Deserialize(const uint8_t *input);
     //指定lobid和lob类型来创建一个loblocator
     LOBLocator()
         :size(HEAD_SIZE),
@@ -47,7 +47,7 @@ public:
         LOB_version(0x01),
         data_size(0),
         LOB_checksum(0){}
-
+    uint32_t get_head_size()const{return size;}
     void init(uint32_t lobid, uint32_t seg_id, uint32_t t){
         LOBID = lobid;
         segID = seg_id;

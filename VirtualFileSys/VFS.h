@@ -20,6 +20,7 @@ class VFS{
 public:
     static VFS *get_VFS(Options *op);//单例模式
     static VFS *get_VFS();//单例模式重载
+    bool if_have_seg(uint32_t id)const{return M.count(id) > 0;}
     Status create_seg(uint32_t id);//创建一个段
     Status free_seg(uint32_t id);//删除一个段
     //追加指定长度的数据

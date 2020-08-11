@@ -111,6 +111,7 @@ Status VFS::create_seg(uint32_t id){
     SegMeta sm;
     write_seg_meta(bh2,sm);//写入一个空的元数据文件块
     write_add_seg_info();//修改段信息结构了，所以要写入
+    nums++;
     return s;
 }
 

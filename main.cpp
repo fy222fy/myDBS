@@ -9,6 +9,7 @@
 #include "DataFile/DataFile.h"
 #include "VirtualFileSys/VFS.h"
 #include "LOB/LOB.h"
+#include "DB/DB.h"
 #include <ctime>
 using namespace std;
 
@@ -172,8 +173,6 @@ int test_lob(){
     uint32_t lob_seg_id;
     BBB.create_lobseg(lob_seg_id);//创建一个lob段
     LOBLocator *ll = new LOBLocator();
-    BBB.create_locator(ll,lob_seg_id);
-    
     uint8_t data[10000];
     int fd = open("book",O_RDWR);
     read(fd,data,5000);
@@ -188,10 +187,26 @@ int test_lob(){
     return 0;
 }
 
+int test_DB(){
+    Env *env = new LinuxEnv();
+    Options *op = new Options(env);
+    DB *db = DB::open(op);
+    db->create_table("哈哈哈");
+    LOBLocator *ll = new LOBLocator();
+    db->create_locator("哈哈哈",ll);//创建一个locator
+    LOB lob;
+    uint8_t data[10000];
+    int fd = open("book",O_RDWR);
+    read(fd,data,5000);
+    lob.WRITEAPPEND(ll,1000,data);
+    db->insert("哈哈哈",1,ll);
+    return 0;
+}
+
 int main(){
     //a_single_fun_to_test_VFS();
-    test_lob();
-    vector<int> a{8,-8};
+    //test_lob();
+    test_DB();
     //a = asteroidCollision(a);
     exit(1);
 }
