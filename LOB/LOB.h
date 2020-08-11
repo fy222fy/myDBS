@@ -4,7 +4,7 @@
 #include<cstring>
 #include<vector>
 #include "../include/status.h"
-#include "LOB_locator.h"
+#include "../include/LOB_locator.h"
 #include "../Util/Util.h"
 
 struct LHP;
@@ -182,10 +182,6 @@ struct LHIP
 class LOBimpl{
 public:
     LOBimpl(LOBLocator *ll);
-    //创建一个空的LOcator
-    Status create_locator(LOBLocator *llp, uint32_t seg_id);
-    //创建一个空的段
-    Status create_lobseg(uint32_t &seg_id);
     /// 追加数据
     /// \param ll lOBLocator
     /// \param data 要追加的数据
@@ -234,7 +230,6 @@ private:
     Status write_LHIP(uint64_t offset, LHIP lhip);
     Status read_LHIP(uint64_t offset, LHIP &lhip);
     Status free_LHIP( LHIP &lhip);
-    uint32_t new_lob_id();
     //在out-1结构中插入数据，如果能全部插入就全部插入，否则插满返回即可
     Status insert_out1(const uint8_t *data);
     LOBLocator *ll;//一个lobimpl负责一个locator的操作
@@ -244,24 +239,36 @@ private:
     vector<pair<uint64_t,uint64_t>> all_lpa;//保存了所有的lpa
     bool if_inrow;
     uint8_t *inrow_data;//不断用到的data
-    uint64_t inrow_data_size;//临时用的data的size
     uint64_t data_size;//数据的大小
     void set_inrow_data(uint8_t *new_data, uint64_t len){
         free_inrow_data();
-        inrow_data = new uint8_t[len];
-        memcpy(inrow_data,new_data,len);
-        inrow_data_size = len;
-        if_inrow = true;
+        if(len != 0){
+            inrow_data = new uint8_t[len];
+            memcpy(inrow_data,new_data,len);
+            data_size = len;
+            if_inrow = true;
+        }
     }
     void free_inrow_data(){
         if(inrow_data != nullptr){
             delete[] inrow_data; 
             inrow_data = nullptr;
         } 
-        inrow_data_size = 0;
+        data_size = 0;
         if_inrow = false;
     }
-    void add_lpa(uint64_t addr,uint64_t size){all_lpa.emplace_back(make_pair(addr,size));}
+    void add_lpa(uint64_t addr,uint64_t size){
+        all_lpa.emplace_back(make_pair(addr,size));
+        data_size += size;
+    }
+    void insert_lpa(uint64_t addr, uint64_t size, int index){
+        all_lpa.insert(all_lpa.begin()+index,make_pair(addr,size));
+        data_size += size;
+    }
+    void remove_lpa(int index){
+        data_size -= all_lpa[index].second;
+        all_lpa.erase(all_lpa.begin()+index);
+    }
 
 };
 
@@ -269,6 +276,10 @@ private:
 class LOB{
 public:
     LOB(){}
+    //创建一个空的LOcator
+    Status create_locator(LOBLocator *llp, uint32_t seg_id);
+    //创建一个空的段
+    Status create_lobseg(uint32_t &seg_id);
     /// 比较两个LOB中的一段数据是否相同
     /// \param lob_1 第一个LOB的指示器
     /// \param lob_2 第二个LOB的指示器
@@ -342,7 +353,7 @@ public:
     Status TRIM(LOBLocator *lob_loc, uint64_t newlen);
     
 private:
-    LOBimpl lobimpl;
+    uint32_t new_lob_id();
 };
 
 #endif //fdsa

@@ -7,7 +7,7 @@ VFS* VFS::get_VFS(Options *op){//获得单例模式的VFS
         if(op == nullptr){
             assert("首次调用vfs必须指定op");
         }
-        if(!DataFile::if_exist(vfs.fname,op)){
+        if(!DataFile::if_exist(vfs.fname,op)){//如果不存在
             vfs.df = new DataFile();
             DataFile::create_datafile(vfs.fname,op,vfs.df);//创建数据文件
             vfs.is_active = true;

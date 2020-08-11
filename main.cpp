@@ -168,27 +168,23 @@ int test_lob(){
     Env *env = new LinuxEnv();
     Options *op = new Options(env);
     VFS *vfs = VFS::get_VFS(op);
-    LOBimpl *lob = new LOBimpl();
+    LOB BBB;
     uint32_t lob_seg_id;
-    lob->create_lobseg(lob_seg_id);//创建一个lob段
+    BBB.create_lobseg(lob_seg_id);//创建一个lob段
     LOBLocator *ll = new LOBLocator();
-    lob->create_locator(ll,lob_seg_id);
+    BBB.create_locator(ll,lob_seg_id);
+    
     uint8_t data[10000];
-    for(int i = 0; i < 10000; i++) data[i] = 'A';
+    int fd = open("book",O_RDWR);
+    read(fd,data,5000);
     uint8_t data2[10000];
     for(int i =0;i<10000;i++) data2[i] = 'B';
     data[50] = 'F';
     uint8_t result[1000];
     int a = LOBLocator::INLINE_MAX_SIZE + LOBimpl::OUTLINE_1_MAX_SIZE + LOBimpl::OUTLINE_2_MAX_SIZE +LOBimpl::OUTLINE_3_MAX_SIZE;
-    lob->append(ll,data,200);
-    lob->read(ll,48,result,20);
-    lob->write(ll,52,data2,10);
-    lob->read(ll,48,result,20);
-    lob->erase(ll,51,50);
-    lob->read(ll,48,result,20);
-    lob->append(ll,data,2);
-    lob->read(ll,149,result,3);
-    //lob->append(ll,data2);
+    BBB.WRITEAPPEND(ll,1000,data);
+    BBB.FRAGMENT_INSERT(ll,100,500,data2);
+    BBB.READ(ll,300,400,result);
     return 0;
 }
 

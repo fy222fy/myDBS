@@ -33,7 +33,7 @@ Status LinuxFile::Open(std::string fname){
     Status s;
     filename = fname;
     if(fd != -1) s.FetalError("该数据文件已经打开，使用有误。");
-    int fd = open(filename.c_str(),O_RDWR);
+    fd = open(filename.c_str(),O_RDWR);
     if(fd == -1){
         s.FetalError("文件打开失败，可能是还没有创建文件");
     } 

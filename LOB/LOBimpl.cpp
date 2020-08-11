@@ -9,7 +9,15 @@ Status LOBLocator::Serialize(uint8_t *result, LOBLocator **ll){
 Status LOBLocator::Deserialize(const uint8_t *input, LOBLocator *ll){
     ;
 }
-LOBimpl::LOBimpl(LOBLocator *ll):ll(ll),segid(ll->get_seg_id()),cur_version(ll->get_version()+1),mode(ll->get_mode()),if_inrow(ll->get_mode()==0x10){
+LOBimpl::LOBimpl(LOBLocator *ll)
+    :ll(ll),
+    segid(ll->get_seg_id()),
+    cur_version(ll->get_version()+1),
+    mode(ll->get_mode()),
+    inrow_data(if_inrow ? ll->get_data():nullptr),
+    if_inrow(ll->get_mode()==0x10),
+    data_size(ll->get_data_size()){
+    
     if(ll->get_mode()==0x10){
         set_inrow_data(ll->get_data(),ll->get_data_size());
     }
@@ -34,24 +42,6 @@ LOBimpl::LOBimpl(LOBLocator *ll):ll(ll),segid(ll->get_seg_id()),cur_version(ll->
     }
 }
 
-uint32_t LOBimpl::new_lob_id(){
-    return 1001;
-}
-
-Status LOBimpl::create_locator(LOBLocator *llp, uint32_t seg_id){
-    Status s;
-    uint32_t lob_new_id =  new_lob_id();//创建一个LOBID
-    llp->init(lob_new_id,seg_id,0x01);
-    return s;
-}
-
-Status LOBimpl::create_lobseg(uint32_t &seg_id){
-    Status s;
-    VFS *vfs = VFS::get_VFS();//获取VFS
-    seg_id = vfs->new_segid();
-    vfs->create_seg(seg_id);
-    return s;
-}
 Status LOBimpl::append(const uint8_t *data, uint64_t amount){
     Status s;
     if(amount + ll->get_data_size() > LOBimpl::OUTLINE_3_MAX_SIZE) s.FetalError("append的数据超过最大限制");
@@ -63,8 +53,9 @@ Status LOBimpl::append(const uint8_t *data, uint64_t amount){
         set_inrow_data(temp,new_len);
     }
     else{//需要写入文件了
+        free_inrow_data();
         int beg = 0;
-        for(int beg = 0; beg + LOB_PAGE_SIZE < new_len; beg+=LOB_PAGE_SIZE){
+        for(; beg + LOB_PAGE_SIZE < new_len; beg+=LOB_PAGE_SIZE){
             uint64_t offset;
             create_lobpage(offset,temp+beg,LOB_PAGE_SIZE);
             add_lpa(offset,LOB_PAGE_SIZE);
@@ -72,9 +63,8 @@ Status LOBimpl::append(const uint8_t *data, uint64_t amount){
         if(beg < new_len){
             uint64_t offset;
             create_lobpage(offset,temp+beg,new_len - beg);
-            add_lpa(offset,LOB_PAGE_SIZE);
+            add_lpa(offset,new_len - beg);
         }
-        free_inrow_data();
     }
     return s;
 }
@@ -90,39 +80,43 @@ Status LOBimpl::insert(uint64_t data_off, const uint8_t *data, uint64_t amount){
         memcpy(temp,inrow_data+data_off+amount,data_size-data_off);
         append(temp,amount+data_size);
     }
-    uint64_t cur_off = 0;
-    for(uint64_t i = 0; i < all_lpa.size();i++){
-        if(cur_off + all_lpa[i].second > data_off){//找到了位置！
-            uint8_t temp[all_lpa[i].second];
-            uint64_t temp_off = data_off - cur_off;
-            uint64_t offset;
-            read_lobpage(offset,temp,all_lpa[i].second);
-            create_lobpage(offset,temp,temp_off);//前半段
-            all_lpa[i].first = offset;
-            all_lpa[i].second = temp_off;
-            create_lobpage(offset,temp+temp_off,all_lpa[i].second-temp_off);
-            all_lpa.insert(all_lpa.begin()+i+1,make_pair(offset,all_lpa[i].second-temp_off));
-            i++;
-            int beg = 0;
-            for(int beg = 0; beg + LOB_PAGE_SIZE < amount; beg+=LOB_PAGE_SIZE){
+    else{
+        uint64_t cur_off = 0;
+        for(uint64_t i = 0; i < all_lpa.size();i++){
+            if(cur_off + all_lpa[i].second > data_off){//找到了位置！
+                uint8_t temp[all_lpa[i].second];
+                uint64_t temp_off = data_off - cur_off; //前半段长度
+                uint64_t last_off = all_lpa[i].second-temp_off ;//后半段长度 
+                read_lobpage(all_lpa[i].first,temp,all_lpa[i].second);
                 uint64_t offset;
-                create_lobpage(offset,temp+beg,LOB_PAGE_SIZE);
-                all_lpa.insert(all_lpa.begin()+i,make_pair(offset,LOB_PAGE_SIZE));
+                create_lobpage(offset,temp,temp_off);//前半段 
+                remove_lpa(i);
+                insert_lpa(offset,temp_off,i);
+                create_lobpage(offset,temp+temp_off,last_off);
+                insert_lpa(offset,last_off,i+1);
                 i++;
+                int beg = 0;
+                for(; beg + LOB_PAGE_SIZE < amount; beg+=LOB_PAGE_SIZE){
+                    uint64_t offset;
+                    create_lobpage(offset,data+beg,LOB_PAGE_SIZE);
+                    uint64_t temp_size = LOB_PAGE_SIZE;
+                    insert_lpa(offset,temp_size,i);
+                    i++;
+                }
+                if(beg < amount){
+                    uint64_t offset;
+                    create_lobpage(offset,data+beg,amount - beg);
+                    insert_lpa(offset,amount - beg,i);
+                    i++;
+                }
+                break;
             }
-            if(beg < amount){
-                uint64_t offset;
-                create_lobpage(offset,temp+beg,amount - beg);
-                all_lpa.insert(all_lpa.begin()+i,make_pair(offset,amount - beg));
-                i++;
+            else{
+                cur_off += all_lpa[i].second;
             }
-            free_inrow_data();
-            break;
-        }
-        else{
-            cur_off += all_lpa[i].second;
         }
     }
+    
     return s;
 }
 Status LOBimpl::read(uint64_t data_off, uint8_t *result, uint64_t amount){
@@ -131,57 +125,109 @@ Status LOBimpl::read(uint64_t data_off, uint8_t *result, uint64_t amount){
     if(if_inrow){//如果当前是行内存//直接读取指定
         memcpy(result,inrow_data+data_off,amount);
     }
-    uint64_t cur_off = 0;
-    uint64_t result_off = 0;//表示结果读到多少了
-    int state = 0;//0表示正在找，1表示正在连续读块，2表示已经完成
-    for(uint64_t i = 0; i < all_lpa.size();i++){
-        if(state == 0){
-            if(cur_off + all_lpa[i].second > data_off){//找到了位置！
-                uint8_t temp[all_lpa[i].second];
-                uint64_t temp_off = data_off - cur_off;
-                read_lobpage(all_lpa[i].first,temp,all_lpa[i].second);
-                if(all_lpa[i].second-temp_off > amount){//本块内足够读完
-                    memcpy(result,temp+temp_off,amount);
+    else{
+        uint64_t cur_off = 0;
+        uint64_t result_off = 0;//表示结果读到多少了
+        int state = 0;//0表示正在找，1表示正在连续读块，2表示已经完成
+        for(uint64_t i = 0; i < all_lpa.size();i++){
+            if(state == 0){
+                if(cur_off + all_lpa[i].second > data_off){//找到了位置！
+                    uint8_t temp[all_lpa[i].second];
+                    uint64_t temp_off = data_off - cur_off;
+                    read_lobpage(all_lpa[i].first,temp,all_lpa[i].second);
+                    if(all_lpa[i].second-temp_off > amount){//本块内足够读完
+                        memcpy(result,temp+temp_off,amount);
+                        break;
+                    }
+                    else{
+                        memcpy(result,temp+temp_off,all_lpa[i].second-temp_off);//后半部分写进来
+                        result_off += all_lpa[i].second-temp_off;
+                        cur_off += all_lpa[i].second;
+                        state = 1;
+                    }
+                }
+                else{
+                    cur_off += all_lpa[i].second;
+                }
+            }
+            else if(state == 1){
+                if(cur_off + all_lpa[i].second > data_off + amount){//最后一个块
+                    uint8_t temp[all_lpa[i].second];
+                    uint64_t temp_off = data_off + amount - cur_off;
+                    read_lobpage(all_lpa[i].first,temp,all_lpa[i].second);
+                    memcpy(result+result_off,temp,temp_off);
                     break;
                 }
                 else{
-                    memcpy(result,temp+temp_off,all_lpa[i].second-temp_off);//后半部分写进来
-                    result_off += all_lpa[i].second-temp_off;
+                    uint8_t temp[all_lpa[i].second];
+                    read_lobpage(all_lpa[i].first,temp,all_lpa[i].second);
+                    memcpy(result+result_off, temp, all_lpa[i].second);
                     cur_off += all_lpa[i].second;
-                    state = 1;
+                    result_off += all_lpa[i].second;
                 }
-            }
-            else{
-                cur_off += all_lpa[i].second;
-            }
-        }
-        else if(state == 1){
-            if(cur_off + all_lpa[i].second > data_off + amount){//最后一个块
-                uint8_t temp[all_lpa[i].second];
-                uint64_t temp_off = data_off + amount - cur_off;
-                read_lobpage(all_lpa[i].first,temp,all_lpa[i].second);
-                memcpy(result+result_off,temp,temp_off);
-                break;
-            }
-            else{
-                uint8_t temp[all_lpa[i].second];
-                read_lobpage(all_lpa[i].first,temp,all_lpa[i].second);
-                memcpy(result+result_off, temp, all_lpa[i].second);
-                result_off += all_lpa[i].second;
             }
         }
     }
+    
     return s;
 }
 Status LOBimpl::erase(uint64_t data_off, uint64_t amount){
     Status s;
     if(data_off > ll->get_data_size()) s.FetalError("要删除的位置比原长度还要大，请核实");
-    
+    if(data_off + amount > ll->get_data_size()) amount = ll->get_data_size()-data_off;
+    if(if_inrow){//如果当前是行内存//直接读取指定
+        uint8_t temp[data_size - amount];
+        memcpy(temp,inrow_data,data_off);
+        memcpy(temp,inrow_data + data_off + amount,data_size-data_off-amount);
+        set_inrow_data(temp,data_size - amount);
+    }
+    else{
+        uint64_t cur_off = 0;
+        uint64_t result_off = 0;//表示结果读到多少了
+        int state = 0;//0表示正在找，1表示正在连续读块，2表示已经完成
+        for(uint64_t i = 0; i < all_lpa.size();i++){
+            if(state == 0){
+                if(cur_off + all_lpa[i].second > data_off){//找到了位置！
+                    uint8_t temp[all_lpa[i].second];
+                    uint64_t temp_off = data_off - cur_off;
+                    read_lobpage(all_lpa[i].first,temp,all_lpa[i].second);
+                    uint64_t offset;
+                    create_lobpage(offset,temp,temp_off);//前半段
+                    all_lpa[i].first = offset;
+                    all_lpa[i].second = temp_off;
+                    i++;
+                    state = 1;
+                }
+                else{
+                    cur_off += all_lpa[i].second;
+                }
+            }
+            else if(state == 1){
+                if(cur_off + all_lpa[i].second > data_off + amount){//最后一个块
+                    uint8_t temp[all_lpa[i].second];
+                    uint64_t temp_off = data_off + amount - cur_off;
+                    read_lobpage(all_lpa[i].first,temp,all_lpa[i].second);
+                    uint64_t offset;
+                    create_lobpage(offset,temp+data_off-cur_off,all_lpa[i].second-data_off+cur_off);
+                    all_lpa[i].first = offset;
+                    all_lpa[i].second = all_lpa[i].second-data_off+cur_off;
+                    break;
+                }
+                else{
+                    all_lpa.erase(all_lpa.begin()+i);
+                    cur_off += all_lpa[i].second;
+                    result_off += all_lpa[i].second;
+                }
+                
+            }
+        }
+    }
     return s;
 }
 Status LOBimpl::finish(){
-    if(all_lpa.size() == 0){
-        ll->set_data(data_t,data_size);
+    Status s;
+    if(if_inrow){
+        ll->set_data(inrow_data,data_size);
         ll->update_head(0x10,data_size);
     }
     else if(all_lpa.size()<=LOBLocator::MAX_LPA){
@@ -192,8 +238,13 @@ Status LOBimpl::finish(){
     }
     else if(all_lpa.size() <= LHP::MAX_LPA){
         LHP lhp;
-        for(auto item:all_lpa){
-            lhp.append(item.first,item.second);
+        int inrow_cur_nums = 0;
+        for(int i = 0; i < all_lpa.size(); i++){
+            if(inrow_cur_nums < LOBLocator::MAX_LPA){
+                ll->append_lpas(all_lpa[i].first,all_lpa[i].second);
+                inrow_cur_nums++;
+            }
+            lhp.append(all_lpa[i].first,all_lpa[i].second);
         }
         uint64_t lhpa;
         append_LHP(lhpa,lhp);
@@ -203,12 +254,18 @@ Status LOBimpl::finish(){
     else{
         LHIP lhip;
         LHP lhp;
+        int inrow_cur_nums = 0;
+        ll->clear_all_lpas();//清空lpas重新写
         for(auto item:all_lpa){
             if(lhp.is_full()){
                 uint64_t lhpa;
                 append_LHP(lhpa,lhp);
                 lhip.append(lhpa,lhp.data_size);
                 lhp = LHP();
+            }
+            if(inrow_cur_nums < LOBLocator::MAX_LPA){
+                ll->append_lpas(item.first,item.second);
+                inrow_cur_nums++;
             }
             lhp.append(item.first,item.second);
         }
@@ -220,7 +277,7 @@ Status LOBimpl::finish(){
         ll->set_LHIPA(lhipa);
         ll->update_head(0x13,data_size);
     }
-    
+    return s;
 }
 
 ///////////////////////private function///////////////////////
