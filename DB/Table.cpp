@@ -3,14 +3,16 @@
 Table::Table(const string &name,uint32_t t_seg)
     :name(name),
     table_seg_id(t_seg),
-    if_lob_table(false){
+    if_lob_table(false),
+    nums(0){
     
 }
 Table::Table(const string &name,uint32_t t_seg,uint32_t l_seg)
     :name(name),
     table_seg_id(t_seg),
     lob_seg_id(l_seg),
-    if_lob_table(true){   
+    if_lob_table(true),
+    nums(0){   
 }
 Table::~Table(){
     
@@ -56,6 +58,7 @@ Status Table::write_record(uint32_t id, LOBLocator *loc){
     VFS *vfs =VFS::get_VFS();
     uint64_t offset;
     vfs->append(table_seg_id,offset,result,8+loc->get_head_size());
+    nums++;//增加数据量的计数器
     return s;
 }
 Status Table::read_record(uint32_t id, LOBLocator *loc){
@@ -65,10 +68,10 @@ Status Table::read_record(uint32_t id, LOBLocator *loc){
     VFS *vfs =VFS::get_VFS();
     uint8_t result[VFS::PAGE_FREE_SPACE];//我也不知道会读出来多少，但最多这么多
     bool state = true;
-    int i = 1;
+    int i = 0;
     for(; i < nums; i++){
         int it = 0;
-        vfs->read_page(table_seg_id,i,result);
+        vfs->read_page(table_seg_id,i+1,result);//i+1是因为第0个块已经被表用了
         size = convert.int8_to_int32(result,it);
         it += 4;
         id_t = convert.int8_to_int32(result,it);

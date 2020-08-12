@@ -36,7 +36,6 @@ public:
     static const uint32_t META_NUMS = BlockHead::FREE_SPACE / 12 - 1; //一个元数据文件中包含的地址数量，减一是因为还要存下一个元数据块的地址
     static const uint32_t PAGE_FREE_SPACE = BlockHead::FREE_SPACE; //页内可用空间大小
 private:
-    static VFS *vfs;//单例引用
     Options *op;
     VFS(Options *op);//没用的构造函数
     Status read_seg_info();//从文件头部读所有的段信息
@@ -59,6 +58,7 @@ private:
 struct SegHead{
 public:
     uint32_t ID;//段的ID,一般也就是表的ID
+    const uint64_t indicate = 23438595524477252;
     uint64_t meta_first_addr;//第一块元数据块的地址
     //内存段头创建，之后调用write写入
     SegHead(uint32_t id, uint64_t addr)
@@ -67,15 +67,19 @@ public:
     SegHead():ID(0), meta_first_addr(0){}
     void Serialize(uint8_t *result){
         Convert convert;
+        int it = 0;
         uint8_t *temp = convert.int32_to_int8(ID);//首先写入ID
-        for(int i = 0; i < 4; i++) result[i] = temp[i];
+        for(int i = 0; i < 4; i++) result[it++] = temp[i];
         temp = convert.int64_to_int8(meta_first_addr);
-        for(int i = 0; i < 8; i++) result[4 + i] = temp[i];
+        for(int i = 0; i < 8; i++) result[it++] = temp[i];
+        temp = convert.int64_to_int8(indicate);
+        for(int i = 0; i < 8; i++) result[it++] = temp[i];
     }
     void Deserialize(const uint8_t *input){
         Convert convert;
         ID = convert.int8_to_int32(input,0);//反序列ID
         meta_first_addr = convert.int8_to_int64(input,4);//反序列首元数据地址
+        //跳过对indicate的序列化
     }
 };
 

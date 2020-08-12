@@ -29,16 +29,86 @@ private:
     uint64_t lpas_sizes[MAX_LPA];
     uint64_t lhpa;//保存lhpa或者lhipa，根据类型决定
 public:
-    static const uint32_t HEAD_SIZE = sizeof(size) + sizeof(Locator_version) +
-        sizeof(LOBID) + sizeof(LOB_version) + sizeof(type) + sizeof(mode) + 
-        sizeof(data_size) + sizeof(LOB_checksum);
+    static const uint32_t HEAD_BASIC_SIZE =  sizeof(Locator_version) + sizeof(size) +
+        sizeof(LOBID) + sizeof(segID) + sizeof(LOB_version) + sizeof(type) + sizeof(mode) + 
+        sizeof(data_size) + sizeof(inrow_data_size) +sizeof(LOB_checksum);
     //将locator序列化成一段数据
-    Status Serialize(uint8_t *result);
+    Status Serialize(uint8_t *result){
+        Status s;
+        Convert convert;
+        uint8_t *temp;
+        int it = 0;
+        result[it++] = Locator_version;
+        temp = convert.int32_to_int8(size);
+        for(int i = 0; i < 4; i++) result[it++] = temp[i];
+        temp = convert.int32_to_int8(LOBID);
+        for(int i = 0; i < 4; i++) result[it++] = temp[i];
+        temp = convert.int32_to_int8(segID);
+        for(int i = 0; i < 4; i++) result[it++] = temp[i];
+        temp = convert.int32_to_int8(LOB_version);
+        for(int i = 0; i < 4; i++) result[it++] = temp[i];
+        temp = convert.int32_to_int8(type);
+        for(int i = 0; i < 4; i++) result[it++] = temp[i];
+        result[it++] = mode;
+        temp = convert.int64_to_int8(data_size);
+        for(int i = 0; i < 8; i++) result[it++] = temp[i];
+        temp = convert.int64_to_int8(inrow_data_size);
+        for(int i = 0; i < 8; i++) result[it++] = temp[i];
+        temp = convert.int32_to_int8(LOB_checksum);
+        for(int i = 0; i < 4; i++) result[it++] = temp[i];
+        if(mode == 0x10){//表示行内存储
+            memcpy(result+it,data,data_size);
+        }
+        else{
+            temp = convert.int32_to_int8(lpa_nums);
+            for(int i = 0; i < 4; i++) result[it++] = temp[i];
+            for(int j = 0; j < lpa_nums;j++){
+                temp = convert.int64_to_int8(lpas[j]);
+                for(int i = 0; i < 8; i++) result[it++] = temp[i];
+                temp = convert.int64_to_int8(lpas_sizes[j]);
+                for(int i = 0; i < 8; i++) result[it++] = temp[i];
+            }
+            if(mode != 0x11){
+                temp = convert.int64_to_int8(lhpa);
+                for(int i = 0; i < 8; i++) result[it++] = temp[i];
+            }
+        }
+        return s;
+    }
     //将一段数据反序列化成一个loblocator结构
-    Status Deserialize(const uint8_t *input);
+    Status Deserialize(const uint8_t *input){
+        Status s;
+        Convert convert;
+        int it = 0;
+        Locator_version = input[it++];
+        size = convert.int8_to_int32(input,it); it+=4;
+        LOBID = convert.int8_to_int32(input,it); it+=4;
+        segID = convert.int8_to_int32(input,it); it+=4;
+        LOB_version = convert.int8_to_int32(input,it); it+=4;
+        type = convert.int8_to_int32(input,it); it+=4;
+        mode = input[it++];
+        data_size = convert.int8_to_int64(input,it); it+=8;
+        inrow_data_size = convert.int8_to_int64(input,it); it+=8;
+        LOB_checksum = convert.int8_to_int32(input,it); it+=4;
+        if(mode == 0x10){
+            uint8_t *temp = const_cast<uint8_t *>(input);
+            set_data(temp + it, data_size);
+        }
+        else{
+            lpa_nums = convert.int8_to_int32(input,it); it+=4;
+            for(int j = 0; j < lpa_nums; j++){
+                lpas[j] = convert.int8_to_int64(input,it); it+=8;
+                lpas_sizes[j] = convert.int8_to_int64(input,it); it+=8;
+            }
+            if(mode != 0x11){
+                lhpa  = convert.int8_to_int64(input,it); it+=8;
+            }
+        }
+        return s;
+    }
     //指定lobid和lob类型来创建一个loblocator
     LOBLocator()
-        :size(HEAD_SIZE),
+        :size(HEAD_BASIC_SIZE),
         Locator_version(0x01),
         LOBID(0),
         segID(0),
@@ -46,7 +116,8 @@ public:
         mode(0x10),
         LOB_version(0x01),
         data_size(0),
-        LOB_checksum(0){}
+        LOB_checksum(0),
+        data(nullptr){}
     uint32_t get_head_size()const{return size;}
     void init(uint32_t lobid, uint32_t seg_id, uint32_t t){
         LOBID = lobid;
@@ -57,6 +128,13 @@ public:
     void update_head(uint8_t new_mode, uint64_t new_data_size){    //还需要写一些东西
         mode = new_mode;
         data_size = new_data_size;
+        if(mode == 0x10) size= HEAD_BASIC_SIZE + data_size;
+        else if(mode == 0x11){
+            size = HEAD_BASIC_SIZE + lpa_nums * 16 + 4;//还要加一个lpanums
+        }
+        else{
+            size = HEAD_BASIC_SIZE + lpa_nums *16 + 4 + 8;//还要再加一个lpanums和一个lhpa
+        }
     }
     Status append_lpas(uint64_t addr, uint32_t d_size){
         Status s;
@@ -84,10 +162,17 @@ public:
     uint8_t *get_data() {return data;}
     void set_data(uint8_t *new_data, uint64_t len){
         free_data();
-        data = new uint8_t[len];
-        memcpy(data,new_data,len);
+        if(len > 0){
+            data = new uint8_t[len];
+            memcpy(data,new_data,len);
+        }
     }
-    void free_data() {delete[] data;}
+    void free_data() {
+        if(data != nullptr){
+            delete[] data;
+            data == nullptr;
+        }
+    }
     uint64_t get_data_size() const {return data_size;}
     uint64_t get_inrow_data_size() const {return inrow_data_size;}
     uint32_t get_seg_id() const {return segID;}

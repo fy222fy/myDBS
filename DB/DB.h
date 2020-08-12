@@ -20,6 +20,7 @@ public:
     Status del(const string &name, uint32_t id, LOBLocator *ll);
     //创建一个空的LOcator
     Status create_locator(const string &name, LOBLocator *llp);
+    void close();//安全地退出数据库
 private:
     DB();
     VFS *vfs;//数据库用这个操作vfs
@@ -44,7 +45,6 @@ private:
     uint32_t table_seg_id;
     uint32_t lob_seg_id;
     bool if_lob_table;
-    
 };
 
 #endif //.

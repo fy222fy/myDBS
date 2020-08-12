@@ -134,6 +134,9 @@ int test_vfs_free_seg(uint32_t id){
 }
 
 void a_single_fun_to_test_VFS(){
+    Env *env = new LinuxEnv();
+    Options *op = new Options(env);
+    VFS *vfs = VFS::get_VFS(op);
     test_vfs_crerate_seg(1);
     for(int i = 0; i < 20; i++) 
         test_vfs_append(1);
@@ -188,18 +191,33 @@ int test_lob(){
 }
 
 int test_DB(){
-    Env *env = new LinuxEnv();
-    Options *op = new Options(env);
-    DB *db = DB::open(op);
-    db->create_table("哈哈哈");
-    LOBLocator *ll = new LOBLocator();
-    db->create_locator("哈哈哈",ll);//创建一个locator
-    LOB lob;
     uint8_t data[10000];
     int fd = open("book",O_RDWR);
     read(fd,data,5000);
-    lob.WRITEAPPEND(ll,1000,data);
-    db->insert("哈哈哈",1,ll);
+    uint8_t data2[10000];
+    for(auto &c:data2) c='B';
+    uint8_t result[10000];
+
+    Env *env = new LinuxEnv();
+    Options *op = new Options(env);
+    DB *db = DB::open(op);
+    db->create_table("lobTable");
+    LOBLocator *l = new LOBLocator();
+    LOBLocator *l2 = new LOBLocator();
+    LOBLocator *l3 = new LOBLocator();
+    db->create_locator("lobTable",l);//创建一个locator
+    db->create_locator("lobTable",l2);//创建一个locator
+    db->create_locator("lobTable",l3);//创建一个locator
+    LOB lob;
+    lob.WRITEAPPEND(l3,1000,data);
+    db->insert("lobTable",1,l);
+    db->insert("lobTable",2,l2);
+    db->insert("lobTable",3,l3);
+    
+    LOBLocator *ll3 = new LOBLocator();
+    db->select("lobTable",1,ll3);
+    db->select("lobTable",3,ll3);
+    lob.READ(l3,20,1,result);
     return 0;
 }
 
@@ -207,7 +225,6 @@ int main(){
     //a_single_fun_to_test_VFS();
     //test_lob();
     test_DB();
-    //a = asteroidCollision(a);
     exit(1);
 }
 

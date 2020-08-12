@@ -33,12 +33,12 @@ Status VFS::read_seg_info(){
     Convert convert;
     df->get_first_bh(bh);//获取第一个bh
     uint8_t result[BlockHead::FREE_SPACE];
+    int it = 0;
     df -> read_block(bh,result);//先读出来
-    nums = convert.int8_to_int32(result,0);
-    int j = 8;
-    for(int i = 0; i < nums; i++,j+=8){
-        uint32_t tmp_id = convert.int8_to_int32(result,j);
-        uint64_t p_addr = convert.int8_to_int64(result, j+4);
+    nums = convert.int8_to_int32(result,it); it+=4;
+    for(int i = 0; i < nums; i++){
+        uint32_t tmp_id = convert.int8_to_int32(result,it); it+=4;
+        uint64_t p_addr = convert.int8_to_int64(result,it); it+=8;
         M[tmp_id] = p_addr; //添加到map中
     }
     return s;
@@ -50,16 +50,14 @@ Status VFS::write_add_seg_info(){
     Convert convert;
     df->get_first_bh(bh);//获取第一个bh
     uint8_t input[BlockHead::FREE_SPACE] = {0};
-    uint8_t *temp = convert.int32_to_int8(M.size());
-    for(int i = 0; i< 4;i++) input[i] = temp[i];
-    int findex =8;
-    for(auto item:(M)){
-        temp = convert.int64_to_int8(item.first);
-        for(int i = 0; i< 8;i++) input[findex+i] = temp[i];
-        findex += 8;
+    int it = 0;
+    uint8_t *temp = convert.int32_to_int8(nums);
+    for(int i = 0; i< 4;i++) input[it++] = temp[i];
+    for(auto item:M){
+        temp = convert.int32_to_int8(item.first);
+        for(int i = 0; i< 4;i++) input[it++] = temp[i];
         temp = convert.int64_to_int8(item.second);
-        for(int i = 0; i< 8;i++) input[findex+i] = temp[i];
-        findex += 8;
+        for(int i = 0; i< 8;i++) input[it++] = temp[i];
     }
     df -> write_block(input,BlockHead::FREE_SPACE,bh);
     return s;
@@ -104,6 +102,7 @@ Status VFS::create_seg(uint32_t id){
     BlockHandle bh;
     s = df->alloc_block(bh);//创建一个块，做为段头块
     M[id] = bh.address;
+    nums++;
     BlockHandle bh2;
     s = df->alloc_block(bh2);//为这个段生成第一个元数据信息块
     SegHead sh(id,bh2.address);
@@ -111,7 +110,6 @@ Status VFS::create_seg(uint32_t id){
     SegMeta sm;
     write_seg_meta(bh2,sm);//写入一个空的元数据文件块
     write_add_seg_info();//修改段信息结构了，所以要写入
-    nums++;
     return s;
 }
 

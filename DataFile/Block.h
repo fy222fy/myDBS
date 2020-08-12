@@ -28,7 +28,7 @@ struct BlockHead{
     uint32_t block_size;//块的整体大小，这个部分是固定的
     uint32_t in_offset; //数据在该宏块中的偏移，最初这里设置是固定的。
 
-    const static uint32_t MAX_SIZE = 160;
+    const static uint32_t MAX_SIZE = 320;
     const static uint32_t HEAD_SIZE = 16;
     const static uint32_t FREE_SPACE = MAX_SIZE - HEAD_SIZE;
     Status Deserialize(const uint8_t *result){

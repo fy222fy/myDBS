@@ -40,7 +40,7 @@ Status DB::select(const string &name, uint32_t id, LOBLocator *ll){
     Status s;
     uint32_t s_id = hashT(name);
     uint32_t l_id = hashT(name+"lob");
-    if(!vfs->if_have_seg(s_id) || !vfs->if_have_seg(l_id)) s.FetalError("不存在这个表，无法删除");
+    if(!vfs->if_have_seg(s_id) || !vfs->if_have_seg(l_id)) s.FetalError("不存在这个表，无法读取");
     Table table(name,s_id,l_id);
     table.read_table_head();//读出表结构
     table.read_record(id,ll);
@@ -75,4 +75,8 @@ Status DB::create_locator(const string &name, LOBLocator *llp){
     LOB lob;
     lob.create_locator(llp,l_id);
     return s;
+}
+
+void DB::close(){
+    ;
 }
