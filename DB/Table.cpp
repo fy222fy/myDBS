@@ -80,6 +80,7 @@ Status Table::read_record(uint32_t id, LOBLocator *loc){
         else{//找到id
             loc->Deserialize(result+it);
             state = false;
+            break;
         }
     }
     if(state) s.FetalError("没有找到对应列！");
@@ -92,18 +93,26 @@ Status Table::update_record(uint32_t id, LOBLocator *loc){
     VFS *vfs =VFS::get_VFS();
     uint8_t result[VFS::PAGE_FREE_SPACE];//我也不知道会读出来多少，但最多这么多
     bool state = true;
-    int i = 1;
+    int i = 0;
     for(; i < nums; i++){
         int it = 0;
-        vfs->read_page(table_seg_id,i,result);
+        vfs->read_page(table_seg_id,i+1,result);
         size = convert.int8_to_int32(result,it);
         it += 4;
         id_t = convert.int8_to_int32(result,it);
         it+=4;
         if(id_t != id) continue;
         else{//找到id
-            loc->Serialize(result+it);
+            uint8_t result[8+loc->get_head_size()];//全部重新读
+            int it = 0;
+            uint8_t *temp = convert.int32_to_int8(loc->get_head_size());
+            for(int i =0; i<4;i++) result[it++] = temp[i];
+            temp = convert.int32_to_int8(id);
+            for(int i =0; i<4;i++) result[it++] = temp[i];
+            loc->Serialize(result + it);
+            vfs->write_page(table_seg_id,i+1,result,8+loc->get_head_size());
             state = false;
+            break;
         }
     }
     if(state) s.FetalError("没有找到对应列！");
@@ -116,10 +125,10 @@ Status Table::delete_record(uint32_t id){
     VFS *vfs =VFS::get_VFS();
     uint8_t result[VFS::PAGE_FREE_SPACE];//我也不知道会读出来多少，但最多这么多
     bool state = true;
-    int i = 1;
+    int i = 0;
     for(; i < nums; i++){
         int it = 0;
-        vfs->read_page(table_seg_id,i,result);
+        vfs->read_page(table_seg_id,i+1,result);
         size = convert.int8_to_int32(result,it);
         it += 4;
         id_t = convert.int8_to_int32(result,it);
@@ -127,6 +136,8 @@ Status Table::delete_record(uint32_t id){
         if(id_t != id) continue;
         else{//找到id
             vfs->free_page(table_seg_id,i);//删除这页就ok了
+            state = false;
+            break;
         }
     }
     if(state) s.FetalError("没有找到对应列！");

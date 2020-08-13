@@ -1,10 +1,4 @@
 #include "DB.h"
-DB::DB():vfs(nullptr){}
-DB *DB::open(Options *op){
-    DB *db = new DB();
-    db->vfs = VFS::get_VFS(op);
-    return db;
-}
 Status DB::create_table(const string &name){
     Status s;
     uint32_t s_id = hashT(name);
@@ -57,7 +51,7 @@ Status DB::update(const string &name, uint32_t id, LOBLocator *ll){
     table.write_table_head();
     return s;
 }
-Status DB::del(const string &name, uint32_t id, LOBLocator *ll){
+Status DB::del(const string &name, uint32_t id){
     Status s;
     uint32_t s_id = hashT(name);
     uint32_t l_id = hashT(name+"lob");
@@ -79,4 +73,20 @@ Status DB::create_locator(const string &name, LOBLocator *llp){
 
 void DB::close(){
     ;
+}
+
+void DB::running(){
+    while(true){
+        vector<string> V;//保存所有操作
+        while (true){
+            string temp;
+            cin >> temp;
+            if(temp.find_first_of(';') != string::npos){
+                V.emplace_back(temp.substr(0,temp.find_first_of(';')));
+                break;
+            }
+            else V.emplace_back(temp);
+        }
+        vector<void*> ret = sql.parse(V);
+    }
 }

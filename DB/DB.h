@@ -7,23 +7,26 @@
 #include "../include/LOB_locator.h"
 #include "../LOB/LOB.h"
 #include "../Util/Util.h"
+#include "../SQL/SQL.h"
 
 using namespace std;
 class DB{
 public:
-    static DB *open(Options *op);//打开数据库
+    DB(Options *op){vfs = VFS::get_VFS(op);}//打开数据库
+    ~DB(){}
+    void running();
     Status create_table(const string &nanme);//创建表
     Status drop_table(const string &name);//删除表
     Status insert(const string &name, uint32_t id, LOBLocator *ll);
     Status select(const string &name, uint32_t id, LOBLocator *ll);
     Status update(const string &name, uint32_t id, LOBLocator *ll);
-    Status del(const string &name, uint32_t id, LOBLocator *ll);
+    Status del(const string &name, uint32_t id);
     //创建一个空的LOcator
     Status create_locator(const string &name, LOBLocator *llp);
     void close();//安全地退出数据库
 private:
-    DB();
     VFS *vfs;//数据库用这个操作vfs
+    SQL sql;//sql引擎
     hash<string> hashT;//一个hash函数，用于计算seg——id
 };
 

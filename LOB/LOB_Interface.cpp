@@ -71,6 +71,7 @@ Status LOB::ERASE(LOBLocator *lob_loc, uint64_t amount, uint64_t offset){
     Status s;
     LOBimpl lob(lob_loc);
     lob.erase(offset,amount);
+    lob.finish();
     return s;
 }
 
@@ -78,6 +79,7 @@ Status LOB::FRAGMENT_DELETE(LOBLocator *lob_loc, uint64_t amount, uint64_t offse
     Status s;
     LOBimpl lob(lob_loc);
     lob.erase(offset,amount);
+    lob.finish();
     return s;
 }
 
@@ -112,7 +114,7 @@ Status LOB::FRAGMENT_REPLACE(LOBLocator *lob_loc, uint64_t old_amount, uint64_t 
 }
 
 
-Status LOB::READ(LOBLocator *lob_loc,uint64_t amount,uint64_t offset, uint8_t *data){
+Status LOB::READ(LOBLocator *lob_loc,uint64_t amount, uint64_t offset, uint8_t *data){
     Status s;
     LOBimpl lob(lob_loc);
     lob.read(offset,data,amount);

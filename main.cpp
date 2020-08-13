@@ -200,7 +200,9 @@ int test_DB(){
 
     Env *env = new LinuxEnv();
     Options *op = new Options(env);
-    DB *db = DB::open(op);
+    DB *db = new DB(op);
+    //数据库已经打开，之后进行各种操作
+
     db->create_table("lobTable");
     LOBLocator *l = new LOBLocator();
     LOBLocator *l2 = new LOBLocator();
@@ -213,11 +215,27 @@ int test_DB(){
     db->insert("lobTable",1,l);
     db->insert("lobTable",2,l2);
     db->insert("lobTable",3,l3);
-    
+    db->update("lobTable",2,l3);
+    LOBLocator *temp = new LOBLocator();
+    db->select("lobTable",2,temp);
+    //db->del("lobTable",2);
+    db->drop_table("lobTable");
+    db->create_table("myTable");
+    LOBLocator *ll = new LOBLocator();
+    LOBLocator *ll2 = new LOBLocator();
+    db->create_locator("myTable",ll);//创建一个locator
+    db->create_locator("myTable",ll2);//创建一个locator
+    db->insert("myTable",1,ll);
+    db->insert("myTable",1,ll2);
     LOBLocator *ll3 = new LOBLocator();
-    db->select("lobTable",1,ll3);
-    db->select("lobTable",3,ll3);
-    lob.READ(l3,20,1,result);
+    db->select("myTable",1,ll3);
+    lob.WRITEAPPEND(ll3,70,data);
+    db->update("myTable",1,ll3);
+    db->select("myTable",1,ll3);
+    lob.READ(ll3,20,0,result);
+    lob.ERASE(ll3,10,5);
+    lob.FRAGMENT_INSERT(ll3,100,20,data2);
+    db->update("myTable",1,ll3);
     return 0;
 }
 

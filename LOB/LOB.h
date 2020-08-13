@@ -205,6 +205,18 @@ public:
     /// \param amount 要擦除的数据长度
     Status erase(uint64_t data_off, uint64_t amount);//删除部分数据    
     Status finish();//完成操作，统一写入。
+    void add_lpa(uint64_t addr,uint64_t size){
+        all_lpa.emplace_back(make_pair(addr,size));
+        data_size += size;
+    }
+    void insert_lpa(uint64_t addr, uint64_t size, int index){
+        all_lpa.insert(all_lpa.begin()+index,make_pair(addr,size));
+        data_size += size;
+    }
+    void remove_lpa(int index){
+        data_size -= all_lpa[index].second;
+        all_lpa.erase(all_lpa.begin()+index);
+    }
     static const uint64_t LOB_PAGE_SIZE = VFS::PAGE_FREE_SPACE - LOBP::HEAD_SIZE;
     static const uint64_t LHP_SIZE = VFS::PAGE_FREE_SPACE - LOBP::HEAD_SIZE;
     static const uint64_t LHP_NUMS = LHP_SIZE / 16;
@@ -257,18 +269,7 @@ private:
         data_size = 0;
         if_inrow = false;
     }
-    void add_lpa(uint64_t addr,uint64_t size){
-        all_lpa.emplace_back(make_pair(addr,size));
-        data_size += size;
-    }
-    void insert_lpa(uint64_t addr, uint64_t size, int index){
-        all_lpa.insert(all_lpa.begin()+index,make_pair(addr,size));
-        data_size += size;
-    }
-    void remove_lpa(int index){
-        data_size -= all_lpa[index].second;
-        all_lpa.erase(all_lpa.begin()+index);
-    }
+    
 
 };
 
