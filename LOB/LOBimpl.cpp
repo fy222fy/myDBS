@@ -40,7 +40,7 @@ Status LOBimpl::append(const uint8_t *data, uint64_t amount){
     Status s;
     if(amount + ll->get_data_size() > LOBimpl::OUTLINE_3_MAX_SIZE) s.FetalError("append的数据超过最大限制");
     uint64_t new_len = data_size + amount;
-    uint8_t temp[new_len];
+    uint8_t *temp = new uint8_t[new_len];
     memcpy(temp,inrow_data,data_size);
     memcpy(temp+data_size,data,amount);
     if(new_len <= LOBLocator::INLINE_MAX_SIZE){//表示可以行内存
@@ -60,6 +60,7 @@ Status LOBimpl::append(const uint8_t *data, uint64_t amount){
             add_lpa(offset,new_len - beg);
         }
     }
+    delete temp;
     return s;
 }
 
@@ -69,12 +70,13 @@ Status LOBimpl::insert(uint64_t data_off, const uint8_t *data, uint64_t amount){
     if(data_off == data_size) append(data,amount);
     if(if_inrow){//如果当前是行内存//直接转换成普通的append
         uint64_t new_len = amount+data_size;
-        uint8_t temp[new_len];
+        uint8_t *temp = new uint8_t[new_len];
         memcpy(temp,inrow_data,data_off);
         memcpy(temp+data_off,data,amount);
         memcpy(temp+data_off+amount,inrow_data+data_off,data_size-data_off);
         free_inrow_data();
         append(temp,new_len);
+        delete temp;
     }
     else{
         uint64_t cur_off = 0;

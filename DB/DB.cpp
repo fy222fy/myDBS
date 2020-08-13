@@ -87,6 +87,6 @@ void DB::running(){
             }
             else V.emplace_back(temp);
         }
-        vector<void*> ret = sql.parse(V);
+        
     }
 }

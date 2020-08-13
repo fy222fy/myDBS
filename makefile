@@ -29,4 +29,4 @@ clean :
 	rm LOB/*.o
 	rm DB/*.o
 	rm run
-	rm myFile
+	rm /data/test/myFile

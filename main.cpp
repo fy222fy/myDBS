@@ -183,7 +183,7 @@ int test_lob(){
     for(int i =0;i<10000;i++) data2[i] = 'B';
     data[50] = 'F';
     uint8_t result[1000];
-    int a = LOBLocator::INLINE_MAX_SIZE + LOBimpl::OUTLINE_1_MAX_SIZE + LOBimpl::OUTLINE_2_MAX_SIZE +LOBimpl::OUTLINE_3_MAX_SIZE;
+    uint64_t a = LOBLocator::INLINE_MAX_SIZE + LOBimpl::OUTLINE_1_MAX_SIZE + LOBimpl::OUTLINE_2_MAX_SIZE +LOBimpl::OUTLINE_3_MAX_SIZE;
     BBB.WRITEAPPEND(ll,1000,data);
     BBB.FRAGMENT_INSERT(ll,100,500,data2);
     BBB.READ(ll,300,400,result);
@@ -192,7 +192,7 @@ int test_lob(){
 
 int test_DB(){
     uint8_t data[10000];
-    int fd = open("book",O_RDWR);
+    int fd = open("book2",O_RDWR);
     read(fd,data,5000);
     uint8_t data2[10000];
     for(auto &c:data2) c='B';
@@ -211,6 +211,12 @@ int test_DB(){
     db->create_locator("lobTable",l2);//创建一个locator
     db->create_locator("lobTable",l3);//创建一个locator
     LOB lob;
+    
+    uint8_t *TTT = new uint8_t[536870912];
+    int fd2 = open("/data/test/temp5G",O_RDWR);
+    read(fd,TTT,536870912);
+    lob.WRITEAPPEND(l3,536870912,TTT);
+
     lob.WRITEAPPEND(l3,1000,data);
     db->insert("lobTable",1,l);
     db->insert("lobTable",2,l2);
