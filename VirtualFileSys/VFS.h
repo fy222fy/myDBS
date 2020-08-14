@@ -49,7 +49,7 @@ private:
     uint32_t nums;//目前段的数量
     bool is_active;//判断这个虚拟文件是否启用
     DataFile *df;
-    const string fname = "/data/test/myFile";//默认的文件名，后续支持多文件
+    const string fname = "myFile";//默认的文件名，后续支持多文件
 };
 
 /**

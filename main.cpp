@@ -2,6 +2,7 @@
 #include<fstream>
 #include<string>
 #include<cstring>
+#include<ctime>
 #include "include/status.h"
 #include "include/env.h"
 #include "Util/linux_file.h"
@@ -212,10 +213,9 @@ int test_DB(){
     db->create_locator("lobTable",l3);//创建一个locator
     LOB lob;
     
-    uint8_t *TTT = new uint8_t[536870912];
-    int fd2 = open("/data/test/temp5G",O_RDWR);
-    read(fd,TTT,536870912);
-    lob.WRITEAPPEND(l3,536870912,TTT);
+    uint8_t *TTT = new uint8_t[5368709120];
+    for(uint64_t i = 0; i < 5368709120;i++) TTT[i] = data[i%10000];
+    lob.WRITEAPPEND(l3,5368709120,TTT);
 
     lob.WRITEAPPEND(l3,1000,data);
     db->insert("lobTable",1,l);

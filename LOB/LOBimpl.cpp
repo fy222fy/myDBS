@@ -39,24 +39,33 @@ LOBimpl::LOBimpl(LOBLocator *loc)
 Status LOBimpl::append(const uint8_t *data, uint64_t amount){
     Status s;
     if(amount + ll->get_data_size() > LOBimpl::OUTLINE_3_MAX_SIZE) s.FetalError("append的数据超过最大限制");
-    uint64_t new_len = data_size + amount;
+    uint64_t new_len = if_inrow ? data_size + amount : amount;
     uint8_t *temp = new uint8_t[new_len];
-    memcpy(temp,inrow_data,data_size);
-    memcpy(temp+data_size,data,amount);
+    const uint8_t *use;
+    if(if_inrow){
+        memcpy(temp,inrow_data,data_size);
+        memcpy(temp+data_size,data,amount); 
+        use = temp; 
+    }
+    else{//如果当前不是行内存
+        use = data;
+    }
     if(new_len <= LOBLocator::INLINE_MAX_SIZE){//表示可以行内存
-        set_inrow_data(temp,new_len);
+        set_inrow_data(use,new_len);
     }
     else{//需要写入文件了
         free_inrow_data();
         int beg = 0;
+        clock_t start = clock();
         for(; beg + LOB_PAGE_SIZE < new_len; beg+=LOB_PAGE_SIZE){
             uint64_t offset;
-            create_lobpage(offset,temp+beg,LOB_PAGE_SIZE);
+            create_lobpage(offset,use+beg,LOB_PAGE_SIZE);
             add_lpa(offset,LOB_PAGE_SIZE);
         }
+        cout << "运行时间长度为："<<clock()-start<<endl;
         if(beg < new_len){
             uint64_t offset;
-            create_lobpage(offset,temp+beg,new_len - beg);
+            create_lobpage(offset,use+beg,new_len - beg);
             add_lpa(offset,new_len - beg);
         }
     }

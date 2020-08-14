@@ -7,7 +7,6 @@
 #include "../include/LOB_locator.h"
 #include "../LOB/LOB.h"
 #include "../Util/Util.h"
-#include "../SQL/SQL.h"
 
 using namespace std;
 class DB{
@@ -26,7 +25,6 @@ public:
     void close();//安全地退出数据库
 private:
     VFS *vfs;//数据库用这个操作vfs
-    SQL sql;//sql引擎
     hash<string> hashT;//一个hash函数，用于计算seg——id
 };
 

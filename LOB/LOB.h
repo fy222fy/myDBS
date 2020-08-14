@@ -252,7 +252,7 @@ private:
     bool if_inrow;
     uint8_t *inrow_data;//不断用到的data
     uint64_t data_size;//数据的大小
-    void set_inrow_data(uint8_t *new_data, uint64_t len){
+    void set_inrow_data(const uint8_t *new_data, uint64_t len){
         free_inrow_data();
         if(len != 0){
             inrow_data = new uint8_t[len];
